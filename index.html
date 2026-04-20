@@ -120,7 +120,7 @@ const SHEET_NAMES = {
 };
 
 const MASTER_FIELDS   = ['id','顧問先名','業種'];
-const DELIVERY_FIELDS = ['id','顧問先名','区分','保険者','サービス種別','指定権者URL','打ち合わせ日','作成日','納品日','提出方法','提出日','OK'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','打ち合わせ日','作成日','納品日','提出方法','提出日','区分','保険者','サービス種別','指定権者URL','OK'];
 
 async function createSpreadsheet(token) {
   const body = {
@@ -350,85 +350,188 @@ function MasterView({ masters, onSave, onDelete }) {
 const KUBUN_OPTIONS = ['介護保険', '障害'];
 const TEISHUTSU_OPTIONS = ['自社で提出', '齊藤事務所で提出'];
 
-function DeliveryModal({ initial, masters, isRinji, docType, onSave, onClose }) {
-  const emptyForm = {
-    顧問先名:'', 区分:'介護保険', 保険者:'', サービス種別:'',
-    指定権者URL:'', 打ち合わせ日:'', 作成日:'', 納品日:'',
-    提出方法:'自社で提出', 提出日:'', OK:false,
-  };
-  const [form, setForm] = useState(initial ? {
-    ...initial,
-    OK: initial.OK === 'true' || initial.OK === true,
-  } : emptyForm);
-  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+/* ── フラット行 ↔ グループ変換 ── */
+function flatToGroups(rows) {
+  const map = new Map();
+  const order = [];
+  rows.forEach(r => {
+    const gid = r['グループid'] != null && r['グループid'] !== '' ? Number(r['グループid']) : Number(r['id'] ?? 0);
+    if (!map.has(gid)) {
+      map.set(gid, {
+        グループid: gid,
+        顧問先名:   r['顧問先名']  ?? '',
+        打ち合わせ日: r['打ち合わせ日'] ?? '',
+        作成日:     r['作成日']    ?? '',
+        納品日:     r['納品日']    ?? '',
+        提出方法:   r['提出方法']  ?? '自社で提出',
+        提出日:     r['提出日']    ?? '',
+        items: [],
+      });
+      order.push(gid);
+    }
+    map.get(gid).items.push({
+      保険者id:    Number(r['保険者id'] ?? 0),
+      区分:        r['区分']        ?? '介護保険',
+      保険者:      r['保険者']      ?? '',
+      サービス種別: r['サービス種別'] ?? '',
+      指定権者URL: r['指定権者URL'] ?? '',
+      OK:          r['OK'] === 'true' || r['OK'] === true,
+    });
+  });
+  return order.map(gid => map.get(gid));
+}
+
+function groupsToFlat(groups) {
+  const flat = [];
+  groups.forEach(g => {
+    g.items.forEach(item => {
+      flat.push({
+        グループid:   g.グループid,
+        保険者id:     item.保険者id,
+        顧問先名:     g.顧問先名,
+        打ち合わせ日: g.打ち合わせ日,
+        作成日:       g.作成日,
+        納品日:       g.納品日,
+        提出方法:     g.提出方法,
+        提出日:       g.提出日,
+        区分:         item.区分,
+        保険者:       item.保険者,
+        サービス種別: item.サービス種別,
+        指定権者URL:  item.指定権者URL,
+        OK:           item.OK,
+      });
+    });
+  });
+  return flat;
+}
+
+/* ── グループ編集モーダル ── */
+function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, onClose }) {
   const dateLabel = docType === '計画書' ? '計画書作成日' : '実績報告書作成日';
+  const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 保険者:'', サービス種別:'', 指定権者URL:'', OK:false });
+
+  const initGroup = initial || {
+    グループid: null, 顧問先名:'', 打ち合わせ日:'', 作成日:'', 納品日:'',
+    提出方法:'自社で提出', 提出日:'', items:[emptyItem()],
+  };
+
+  const [shared, setShared] = useState({
+    顧問先名:   initGroup.顧問先名,
+    打ち合わせ日: initGroup.打ち合わせ日,
+    作成日:     initGroup.作成日,
+    納品日:     initGroup.納品日,
+    提出方法:   initGroup.提出方法,
+    提出日:     initGroup.提出日,
+  });
+  const [items, setItems] = useState(initGroup.items.length > 0 ? initGroup.items : [emptyItem()]);
+
+  const setS = (k, v) => setShared(f => ({...f, [k]: v}));
+  const setItem = (idx, k, v) => setItems(its => its.map((it, i) => i === idx ? {...it, [k]: v} : it));
+  const addItem = () => setItems(its => [...its, emptyItem()]);
+  const removeItem = idx => setItems(its => its.filter((_, i) => i !== idx));
+
+  function handleSave() {
+    if (!shared['顧問先名']) return;
+    /* グループidを決定（新規なら既存最大値+1） */
+    const allGids = allRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0)).filter(n => !isNaN(n));
+    const gid = initial ? initial.グループid : (allGids.length > 0 ? Math.max(...allGids) + 1 : 1);
+    /* 保険者idを採番（グループ内で連番） */
+    const numberedItems = items.map((it, i) => ({...it, 保険者id: it.保険者id || i + 1}));
+    onSave({ ...shared, グループid: gid, items: numberedItems });
+  }
+
+  const thStyle = {fontWeight:'700', fontSize:'14px', padding:'6px 8px', background:'#f9fafb', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap'};
+  const tdStyle = {padding:'6px 8px', verticalAlign:'middle'};
 
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'24px'}}>
+      <div className="modal-box" style={{width:'780px'}} onClick={e => e.stopPropagation()}>
+        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'20px'}}>
           {initial ? '届出を編集' : '届出を追加'}
         </h2>
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+
+        {/* 共通フィールド */}
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'20px'}}>
           <div style={{gridColumn:'1/-1'}}>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>顧問先名</label>
-            <select value={form['顧問先名']} onChange={e => set('顧問先名', e.target.value)}>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>顧問先名</label>
+            <select value={shared['顧問先名']} onChange={e => setS('顧問先名', e.target.value)}>
               <option value="">-- 選択 --</option>
               {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
             </select>
           </div>
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>区分</label>
-            <select value={form['区分']} onChange={e => set('区分', e.target.value)}>
-              {KUBUN_OPTIONS.map(o => <option key={o}>{o}</option>)}
-            </select>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>打ち合わせ日</label>
+            <input type="date" value={shared['打ち合わせ日']} onChange={e => setS('打ち合わせ日', e.target.value)} />
           </div>
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>
-              保険者{isRinji ? '（都道府県のみ）' : '（都道府県または市区町村）'}
-            </label>
-            <input value={form['保険者']} onChange={e => set('保険者', e.target.value)} placeholder="例：東京都" />
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>{dateLabel}</label>
+            <input type="date" value={shared['作成日']} onChange={e => setS('作成日', e.target.value)} />
           </div>
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>サービス種別</label>
-            <input value={form['サービス種別']} onChange={e => set('サービス種別', e.target.value)} placeholder="例：訪問介護" />
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>納品日</label>
+            <input type="date" value={shared['納品日']} onChange={e => setS('納品日', e.target.value)} />
           </div>
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>指定権者URL</label>
-            <input value={form['指定権者URL']} onChange={e => set('指定権者URL', e.target.value)} placeholder="https://..." />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>打ち合わせ日</label>
-            <input type="date" value={form['打ち合わせ日']} onChange={e => set('打ち合わせ日', e.target.value)} />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>{dateLabel}</label>
-            <input type="date" value={form['作成日']} onChange={e => set('作成日', e.target.value)} />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>納品日</label>
-            <input type="date" value={form['納品日']} onChange={e => set('納品日', e.target.value)} />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>提出方法</label>
-            <select value={form['提出方法']} onChange={e => set('提出方法', e.target.value)}>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出担当</label>
+            <select value={shared['提出方法']} onChange={e => setS('提出方法', e.target.value)}>
               {TEISHUTSU_OPTIONS.map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>提出日</label>
-            <input type="date" value={form['提出日']} onChange={e => set('提出日', e.target.value)} />
-          </div>
-          <div style={{display:'flex', alignItems:'center', gap:'10px', gridColumn:'1/-1'}}>
-            <input type="checkbox" id="ok-chk" checked={!!form['OK']}
-              onChange={e => set('OK', e.target.checked)}
-              style={{width:'20px', height:'20px', cursor:'pointer'}} />
-            <label htmlFor="ok-chk" style={{fontWeight:'700', cursor:'pointer'}}>OK（完了）</label>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
+            <input type="date" value={shared['提出日']} onChange={e => setS('提出日', e.target.value)} />
           </div>
         </div>
-        <div style={{display:'flex', gap:'12px', marginTop:'28px', justifyContent:'flex-end'}}>
+
+        {/* 保険者リスト */}
+        <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
+          <span style={{fontWeight:'700', fontSize:'16px'}}>保険者</span>
+          <span style={{fontSize:'13px', color:'#6b7280'}}>{isRinji ? '（都道府県のみ）' : '（都道府県または市区町村）'}</span>
+          <button className="btn btn-secondary" style={{padding:'3px 12px', fontSize:'14px'}} onClick={addItem}>＋ 行を追加</button>
+        </div>
+        <div style={{overflowX:'auto', marginBottom:'20px', border:'1px solid #e5e7eb', borderRadius:'6px'}}>
+          <table style={{width:'100%', borderCollapse:'collapse', minWidth:'560px'}}>
+            <thead>
+              <tr>
+                {['区分','保険者','サービス種別','指定権者URL','OK',''].map(h => (
+                  <th key={h} style={thStyle}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {items.map((it, idx) => (
+                <tr key={it.保険者id} style={{borderBottom:'1px solid #f3f4f6'}}>
+                  <td style={tdStyle}>
+                    <select value={it['区分']} onChange={e => setItem(idx,'区分',e.target.value)} style={{width:'100px'}}>
+                      {KUBUN_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                    </select>
+                  </td>
+                  <td style={tdStyle}>
+                    <input value={it['保険者']} onChange={e => setItem(idx,'保険者',e.target.value)} placeholder="例：東京都" style={{width:'110px'}} />
+                  </td>
+                  <td style={tdStyle}>
+                    <input value={it['サービス種別']} onChange={e => setItem(idx,'サービス種別',e.target.value)} placeholder="例：訪問介護" style={{width:'110px'}} />
+                  </td>
+                  <td style={tdStyle}>
+                    <input value={it['指定権者URL']} onChange={e => setItem(idx,'指定権者URL',e.target.value)} placeholder="https://..." style={{width:'140px'}} />
+                  </td>
+                  <td style={{...tdStyle, textAlign:'center'}}>
+                    <input type="checkbox" checked={!!it.OK} onChange={e => setItem(idx,'OK',e.target.checked)} style={{width:'18px', height:'18px', cursor:'pointer'}} />
+                  </td>
+                  <td style={tdStyle}>
+                    {items.length > 1 && (
+                      <button className="btn btn-danger" style={{padding:'2px 8px', fontSize:'13px'}} onClick={() => removeItem(idx)}>✕</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div style={{display:'flex', gap:'12px', justifyContent:'flex-end'}}>
           <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
-          <button className="btn btn-primary" onClick={() => { if (!form['顧問先名']) return; onSave(form); }}>保存</button>
+          <button className="btn btn-primary" onClick={handleSave}>保存</button>
         </div>
       </div>
     </div>
@@ -439,95 +542,113 @@ function DeliveryModal({ initial, masters, isRinji, docType, onSave, onClose }) 
    届出管理 テーブル
 ══════════════════════════════════════════ */
 function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
-  const [modal, setModal] = useState(null);
+  const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', group}
   const [filterOk, setFilterOk] = useState(false);
 
   const dateLabel = docType === '計画書' ? '計画書作成日' : '実績報告書作成日';
-  const displayed = filterOk ? rows.filter(r => !(r.OK === true || r.OK === 'true')) : rows;
+  const groups = useMemo(() => flatToGroups(rows), [rows]);
+  const displayed = filterOk ? groups.filter(g => !g.items.every(it => it.OK)) : groups;
 
-  function handleSave(form) {
-    if (modal.mode === 'add') {
-      onSave([...rows, { ...form, id: nextId(rows) }]);
-    } else {
-      onSave(rows.map(r => r.id === modal.row.id ? { ...modal.row, ...form } : r));
-    }
+  function handleGroupSave(group) {
+    /* 既存グループを置換 or 新規追加してフラット化して保存 */
+    const others = groups.filter(g => g.グループid !== group.グループid);
+    const newGroups = modal.mode === 'add' ? [...groups, group] : [...others, group].sort((a,b) => a.グループid - b.グループid);
+    onSave(groupsToFlat(newGroups));
     setModal(null);
   }
 
-  const cols = ['顧問先名','区分','保険者','サービス種別','指定権者URL','打ち合わせ日',dateLabel,'納品日','提出方法','提出日','OK','操作'];
+  function handleOkToggle(gid, hokenid, checked) {
+    const newGroups = groups.map(g => g.グループid !== gid ? g : {
+      ...g,
+      items: g.items.map(it => it.保険者id !== hokenid ? it : {...it, OK: checked}),
+    });
+    onSave(groupsToFlat(newGroups));
+  }
+
+  const th = s => ({padding:'10px 12px', textAlign:'left', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', ...s});
+  const td = s => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...s});
+  const mergedTd = (rowSpan, s) => ({...td(s), verticalAlign:'top', paddingTop:'12px', borderRight:'1px solid #e5e7eb', rowSpan});
 
   return (
     <div>
       <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap'}}>
         <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
         <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer'}}>
-          <input type="checkbox" checked={filterOk} onChange={e => setFilterOk(e.target.checked)}
-            style={{width:'18px', height:'18px'}} />
+          <input type="checkbox" checked={filterOk} onChange={e => setFilterOk(e.target.checked)} style={{width:'18px', height:'18px'}} />
           完了を非表示
         </label>
-        <span style={{fontSize:'14px', color:'#6b7280'}}>全{rows.length}件 / 表示{displayed.length}件</span>
+        <span style={{fontSize:'14px', color:'#6b7280'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1400px'}}>
+        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
           <thead>
             <tr>
-              {cols.map(h => (
-                <th key={h} style={{padding:'10px 12px', textAlign:'left', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap'}}>{h}</th>
+              {['顧問先名','打ち合わせ日',dateLabel,'納品日','提出担当','提出日','区分','保険者','サービス種別','指定権者URL','OK','操作'].map(h => (
+                <th key={h} style={th()}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={cols.length} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={12} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
-            {displayed.map(r => {
-              const done = r.OK === true || r.OK === 'true';
-              return (
-                <tr key={r.id} className={done ? 'row-done' : ''} style={{borderBottom:'1px solid #f3f4f6', cursor:'pointer'}}
-                  onClick={() => setModal({mode:'edit', row:r})}>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{r['顧問先名']}</td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>
-                    <span style={{background: r['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: r['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
-                      {r['区分']}
+            {displayed.map(g => {
+              const rs = g.items.length;
+              const groupDone = g.items.every(it => it.OK);
+              return g.items.map((it, idx) => (
+                <tr key={`${g.グループid}-${it.保険者id}`}
+                  style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6', opacity: groupDone ? 0.5 : 1}}>
+                  {/* 結合セル（最初の行のみ） */}
+                  {idx === 0 && <>
+                    <td style={mergedTd(rs, {})} rowSpan={rs}>
+                      <span style={{fontWeight:'700'}}>{g.顧問先名}</span>
+                      <button className="btn btn-secondary" style={{display:'block', padding:'2px 8px', fontSize:'12px', marginTop:'6px'}}
+                        onClick={() => setModal({mode:'edit', group:g})}>編集</button>
+                    </td>
+                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['打ち合わせ日'])}</td>
+                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['作成日'])}</td>
+                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['納品日'])}</td>
+                    <td style={mergedTd(rs, {fontSize:'14px'})} rowSpan={rs}>{g['提出方法']}</td>
+                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['提出日'])}</td>
+                  </>}
+                  {/* 保険者ごとのセル */}
+                  <td style={td()}>
+                    <span style={{background: it['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: it['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
+                      {it['区分']}
                     </span>
                   </td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{r['保険者']}</td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{r['サービス種別']}</td>
-                  <td style={{padding:'8px 12px', maxWidth:'160px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
-                    {r['指定権者URL'] ? <a href={r['指定権者URL']} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
+                  <td style={td()}>{it['保険者']}</td>
+                  <td style={td()}>{it['サービス種別']}</td>
+                  <td style={td({maxWidth:'120px', overflow:'hidden', textOverflow:'ellipsis'})}>
+                    {it['指定権者URL'] ? <a href={it['指定権者URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
                   </td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['打ち合わせ日'])}</td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['作成日'])}</td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['納品日'])}</td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap', fontSize:'14px'}}>{r['提出方法']}</td>
-                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['提出日'])}</td>
-                  <td style={{padding:'8px 12px', textAlign:'center'}}>
-                    <input type="checkbox" checked={done}
-                      onClick={e => e.stopPropagation()}
-                      onChange={e => {
-                        onSave(rows.map(x => x.id === r.id ? {...x, OK: e.target.checked} : x));
-                      }}
+                  <td style={td({textAlign:'center'})}>
+                    <input type="checkbox" checked={!!it.OK}
+                      onChange={e => handleOkToggle(g.グループid, it.保険者id, e.target.checked)}
                       style={{width:'18px', height:'18px', cursor:'pointer'}} />
                   </td>
-                  <td style={{padding:'8px 12px'}}>
-                    <button className="btn btn-danger" style={{padding:'3px 10px', fontSize:'13px'}}
-                      onClick={ev => { ev.stopPropagation(); if (confirm('削除しますか？')) onDelete(r.id); }}>
-                      削除
-                    </button>
-                  </td>
+                  {idx === 0 && (
+                    <td style={mergedTd(rs, {})} rowSpan={rs}>
+                      <button className="btn btn-danger" style={{padding:'3px 10px', fontSize:'13px'}}
+                        onClick={() => { if (confirm('削除しますか？')) onDelete(g.グループid); }}>
+                        削除
+                      </button>
+                    </td>
+                  )}
                 </tr>
-              );
+              ));
             })}
           </tbody>
         </table>
       </div>
       {modal && (
         <DeliveryModal
-          initial={modal.mode === 'edit' ? modal.row : null}
+          initial={modal.mode === 'edit' ? modal.group : null}
+          allRows={rows}
           masters={masters}
           isRinji={isRinji}
           docType={docType}
-          onSave={handleSave}
+          onSave={handleGroupSave}
           onClose={() => setModal(null)}
         />
       )}
@@ -671,8 +792,8 @@ function App() {
     setCurrentRows(rows);
     saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
   }
-  function handleDeliveryDelete(id) {
-    const rows = currentRows.filter(r => r.id !== id);
+  function handleDeliveryDelete(gid) {
+    const rows = currentRows.filter(r => Number(r['グループid'] ?? r['id'] ?? 0) !== gid);
     setCurrentRows(rows);
     saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
   }
