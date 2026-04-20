@@ -18,18 +18,18 @@
     body {
       font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
       font-size: 19px;
-      color: #000000;
+      color: #111827;
       line-height: 1.65;
       font-weight: 500;
     }
 
     .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 800; font-size: 19px; }
     .nav-active  { background-color: #dbeafe; color: #1e3a8a; font-weight: 800; font-size: 19px; }
-    nav a, nav button, .tab-btn { font-size: 19px !important; font-weight: 600 !important; color: #000000; }
+    nav a, nav button, .tab-btn { font-size: 19px !important; font-weight: 600 !important; color: #111827; }
 
-    th { position: sticky; top: 0; z-index: 10; font-size: 18px; color: #000000; font-weight: 700; background: #f9fafb; }
-    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 17px !important; color: #000000 !important; font-weight: 500 !important; }
-    table { color: #000000; font-size: 17px; }
+    th { position: sticky; top: 0; z-index: 10; font-size: 18px; color: #111827; font-weight: 700; background: #f9fafb; }
+    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 17px !important; color: #111827 !important; font-weight: 500 !important; }
+    table { color: #111827; font-size: 17px; }
     tr:hover td { background: #eff6ff; }
 
     .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 260px); }
@@ -38,7 +38,7 @@
 
     input, select, textarea {
       width: 100%; border: 1px solid #9ca3af; border-radius: 6px; padding: 8px 12px;
-      font-size: 17px; font-family: inherit; color: #000000; outline: none; transition: border 0.2s; font-weight: 500;
+      font-size: 17px; font-family: inherit; color: #111827; outline: none; transition: border 0.2s; font-weight: 500;
     }
     input:focus, select:focus, textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
     input::placeholder, textarea::placeholder { color: #374151; font-weight: 500; }
@@ -48,7 +48,7 @@
     .btn-primary:hover { background: #1d4ed8; }
     .btn-danger    { background: #dc2626; color: white; }
     .btn-danger:hover  { background: #b91c1c; }
-    .btn-secondary { background: #f3f4f6; color: #000000; border: 1px solid #9ca3af; }
+    .btn-secondary { background: #f3f4f6; color: #111827; border: 1px solid #9ca3af; }
     .btn-secondary:hover { background: #e5e7eb; }
 
     .text-gray-500 { color: #1f2937 !important; font-weight: 500; }
@@ -56,7 +56,6 @@
     .text-sm  { font-size: 15px !important; font-weight: 500; }
     .text-xs  { font-size: 14px !important; font-weight: 500; }
 
-    .row-done td { opacity: 0.5; }
     input[type="checkbox"] { width: auto; }
   </style>
 </head>
@@ -121,7 +120,7 @@ const SHEET_NAMES = {
 
 const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
-const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','打ち合わせ日','作成日','納品日','提出方法','提出日','区分','保険者','サービス種別','指定権者URL','OK'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL'];
 
 async function createSpreadsheet(token) {
   const body = {
@@ -371,24 +370,22 @@ function flatToGroups(rows) {
     const gid = r['グループid'] != null && r['グループid'] !== '' ? Number(r['グループid']) : Number(r['id'] ?? 0);
     if (!map.has(gid)) {
       map.set(gid, {
-        グループid: gid,
-        顧問先名:   r['顧問先名']  ?? '',
+        グループid:   gid,
+        顧問先名:     r['顧問先名']     ?? '',
         打ち合わせ日: r['打ち合わせ日'] ?? '',
-        作成日:     r['作成日']    ?? '',
-        納品日:     r['納品日']    ?? '',
-        提出方法:   r['提出方法']  ?? '自社で提出',
-        提出日:     r['提出日']    ?? '',
+        納品日:       r['納品日']       ?? '',
+        提出担当:     r['提出担当'] || r['提出方法'] || '自社で提出',
+        提出日:       r['提出日']       ?? '',
         items: [],
       });
       order.push(gid);
     }
     map.get(gid).items.push({
-      保険者id:    Number(r['保険者id'] ?? 0),
-      区分:        r['区分']        ?? '介護保険',
-      保険者:      r['保険者']      ?? '',
-      サービス種別: r['サービス種別'] ?? '',
-      指定権者URL: r['指定権者URL'] ?? '',
-      OK:          r['OK'] === 'true' || r['OK'] === true,
+      保険者id:     Number(r['保険者id'] ?? 0),
+      区分:         r['区分']         ?? '介護保険',
+      提出先:       r['提出先'] || r['保険者'] || '',
+      サービス種別: r['サービス種別']  ?? '',
+      提出先URL:    r['提出先URL'] || r['指定権者URL'] || '',
     });
   });
   return order.map(gid => map.get(gid));
@@ -403,38 +400,43 @@ function groupsToFlat(groups) {
         保険者id:     item.保険者id,
         顧問先名:     g.顧問先名,
         打ち合わせ日: g.打ち合わせ日,
-        作成日:       g.作成日,
         納品日:       g.納品日,
-        提出方法:     g.提出方法,
+        提出担当:     g.提出担当,
         提出日:       g.提出日,
         区分:         item.区分,
-        保険者:       item.保険者,
+        提出先:       item.提出先,
         サービス種別: item.サービス種別,
-        指定権者URL:  item.指定権者URL,
-        OK:           item.OK,
+        提出先URL:    item.提出先URL,
       });
     });
   });
   return flat;
 }
 
+/* 行完了判定 */
+function isRowComplete(g, it) {
+  const itemOk   = !!(it['区分'] && it['サービス種別'] && it['提出先'] && it['提出先URL']);
+  const sharedOk = !!(g['打ち合わせ日'] && g['納品日'] && g['提出担当']);
+  const teihiOk  = g['提出担当'] !== '齊藤事務所で提出' || !!g['提出日'];
+  return itemOk && sharedOk && teihiOk;
+}
+
 /* ── グループ編集モーダル ── */
 function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, onClose }) {
-  const dateLabel = docType === '計画書' ? '計画書作成日' : '実績報告書作成日';
-  const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 保険者:'', サービス種別:'', 指定権者URL:'', OK:false });
+  const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
+  const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 提出先:'', サービス種別:'', 提出先URL:'' });
 
   const initGroup = initial || {
-    グループid: null, 顧問先名:'', 打ち合わせ日:'', 作成日:'', 納品日:'',
-    提出方法:'自社で提出', 提出日:'', items:[emptyItem()],
+    グループid: null, 顧問先名:'', 打ち合わせ日:'', 納品日:'',
+    提出担当:'自社で提出', 提出日:'', items:[emptyItem()],
   };
 
   const [shared, setShared] = useState({
-    顧問先名:   initGroup.顧問先名,
+    顧問先名:     initGroup.顧問先名,
     打ち合わせ日: initGroup.打ち合わせ日,
-    作成日:     initGroup.作成日,
-    納品日:     initGroup.納品日,
-    提出方法:   initGroup.提出方法,
-    提出日:     initGroup.提出日,
+    納品日:       initGroup.納品日,
+    提出担当:     initGroup.提出担当,
+    提出日:       initGroup.提出日,
   });
   const [items, setItems] = useState(initGroup.items.length > 0 ? initGroup.items : [emptyItem()]);
 
@@ -445,21 +447,19 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
 
   function handleSave() {
     if (!shared['顧問先名']) return;
-    /* グループidを決定（新規なら既存最大値+1） */
     const allGids = allRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0)).filter(n => !isNaN(n));
     const gid = initial ? initial.グループid : (allGids.length > 0 ? Math.max(...allGids) + 1 : 1);
-    /* 保険者idを採番（グループ内で連番） */
     const numberedItems = items.map((it, i) => ({...it, 保険者id: it.保険者id || i + 1}));
     onSave({ ...shared, グループid: gid, items: numberedItems });
   }
 
-  const thStyle = {fontWeight:'700', fontSize:'14px', padding:'6px 8px', background:'#f9fafb', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap'};
+  const thStyle = {fontWeight:'700', fontSize:'14px', padding:'6px 8px', background:'#f9fafb', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
   const tdStyle = {padding:'6px 8px', verticalAlign:'middle'};
 
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal-box" style={{width:'780px'}} onClick={e => e.stopPropagation()}>
-        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'20px'}}>
+        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'20px', color:'#111827'}}>
           {initial ? '届出を編集' : '届出を追加'}
         </h2>
 
@@ -478,27 +478,25 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
           </div>
           <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>{dateLabel}</label>
-            <input type="date" value={shared['作成日']} onChange={e => setS('作成日', e.target.value)} />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>納品日</label>
             <input type="date" value={shared['納品日']} onChange={e => setS('納品日', e.target.value)} />
           </div>
           <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出担当</label>
-            <select value={shared['提出方法']} onChange={e => setS('提出方法', e.target.value)}>
+            <select value={shared['提出担当']} onChange={e => setS('提出担当', e.target.value)}>
               {TEISHUTSU_OPTIONS.map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
-            <input type="date" value={shared['提出日']} onChange={e => setS('提出日', e.target.value)} />
-          </div>
+          {shared['提出担当'] === '齊藤事務所で提出' && (
+            <div>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
+              <input type="date" value={shared['提出日']} onChange={e => setS('提出日', e.target.value)} />
+            </div>
+          )}
         </div>
 
-        {/* 保険者リスト */}
+        {/* 提出先リスト */}
         <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
-          <span style={{fontWeight:'700', fontSize:'16px'}}>保険者</span>
+          <span style={{fontWeight:'700', fontSize:'16px'}}>提出先</span>
           <span style={{fontSize:'13px', color:'#6b7280'}}>{isRinji ? '（都道府県のみ）' : '（都道府県または市区町村）'}</span>
           <button className="btn btn-secondary" style={{padding:'3px 12px', fontSize:'14px'}} onClick={addItem}>＋ 行を追加</button>
         </div>
@@ -506,7 +504,7 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
           <table style={{width:'100%', borderCollapse:'collapse', minWidth:'560px'}}>
             <thead>
               <tr>
-                {['区分','保険者','サービス種別','指定権者URL','OK',''].map(h => (
+                {['区分','提出先（保険者）','サービス種別','提出先URL',''].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -520,16 +518,13 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
                     </select>
                   </td>
                   <td style={tdStyle}>
-                    <input value={it['保険者']} onChange={e => setItem(idx,'保険者',e.target.value)} placeholder="例：東京都" style={{width:'110px'}} />
+                    <input value={it['提出先']} onChange={e => setItem(idx,'提出先',e.target.value)} placeholder="例：東京都" style={{width:'110px'}} />
                   </td>
                   <td style={tdStyle}>
                     <input value={it['サービス種別']} onChange={e => setItem(idx,'サービス種別',e.target.value)} placeholder="例：訪問介護" style={{width:'110px'}} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={it['指定権者URL']} onChange={e => setItem(idx,'指定権者URL',e.target.value)} placeholder="https://..." style={{width:'140px'}} />
-                  </td>
-                  <td style={{...tdStyle, textAlign:'center'}}>
-                    <input type="checkbox" checked={!!it.OK} onChange={e => setItem(idx,'OK',e.target.checked)} style={{width:'18px', height:'18px', cursor:'pointer'}} />
+                    <input value={it['提出先URL']} onChange={e => setItem(idx,'提出先URL',e.target.value)} placeholder="https://..." style={{width:'140px'}} />
                   </td>
                   <td style={tdStyle}>
                     {items.length > 1 && (
@@ -556,100 +551,93 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
 ══════════════════════════════════════════ */
 function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
   const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', group}
-  const [filterOk, setFilterOk] = useState(false);
+  const [filterDone, setFilterDone] = useState(false);
 
-  const dateLabel = docType === '計画書' ? '計画書作成日' : '実績報告書作成日';
+  const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
-  const displayed = filterOk ? groups.filter(g => !g.items.every(it => it.OK)) : groups;
+  const displayed = filterDone ? groups.filter(g => !g.items.every(it => isRowComplete(g, it))) : groups;
 
   function handleGroupSave(group) {
-    /* 既存グループを置換 or 新規追加してフラット化して保存 */
     const others = groups.filter(g => g.グループid !== group.グループid);
     const newGroups = modal.mode === 'add' ? [...groups, group] : [...others, group].sort((a,b) => a.グループid - b.グループid);
     onSave(groupsToFlat(newGroups));
     setModal(null);
   }
 
-  function handleOkToggle(gid, hokenid, checked) {
-    const newGroups = groups.map(g => g.グループid !== gid ? g : {
-      ...g,
-      items: g.items.map(it => it.保険者id !== hokenid ? it : {...it, OK: checked}),
-    });
-    onSave(groupsToFlat(newGroups));
-  }
-
-  const th = s => ({padding:'10px 12px', textAlign:'left', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', ...s});
-  const td = s => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...s});
-  const mergedTd = (rowSpan, s) => ({...td(s), verticalAlign:'top', paddingTop:'12px', borderRight:'1px solid #e5e7eb', rowSpan});
+  const thS = {padding:'10px 12px', textAlign:'left', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
+  const cell = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...(bg ? {background:bg} : {})});
+  const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'top', paddingTop:'12px', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
 
   return (
     <div>
       <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap'}}>
         <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
         <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer'}}>
-          <input type="checkbox" checked={filterOk} onChange={e => setFilterOk(e.target.checked)} style={{width:'18px', height:'18px'}} />
+          <input type="checkbox" checked={filterDone} onChange={e => setFilterDone(e.target.checked)} style={{width:'18px', height:'18px'}} />
           完了を非表示
         </label>
         <span style={{fontSize:'14px', color:'#6b7280'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
+        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1100px'}}>
           <thead>
             <tr>
-              {['顧問先名','打ち合わせ日',dateLabel,'納品日','提出担当','提出日','区分','保険者','サービス種別','指定権者URL','OK','操作'].map(h => (
-                <th key={h} style={th()}>{h}</th>
+              {['顧問先名','区分','サービス種別','提出先','提出先URL','打ち合わせ日',dateLabel,'提出担当','提出日','操作'].map(h => (
+                <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={12} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={10} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
-              const groupDone = g.items.every(it => it.OK);
-              return g.items.map((it, idx) => (
-                <tr key={`${g.グループid}-${it.保険者id}`}
-                  style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6', opacity: groupDone ? 0.5 : 1}}>
-                  {/* 結合セル（最初の行のみ） */}
-                  {idx === 0 && <>
-                    <td style={mergedTd(rs, {})} rowSpan={rs}>
-                      <span style={{fontWeight:'700'}}>{g.顧問先名}</span>
-                      <button className="btn btn-secondary" style={{display:'block', padding:'2px 8px', fontSize:'12px', marginTop:'6px'}}
-                        onClick={() => setModal({mode:'edit', group:g})}>編集</button>
+              const groupDone = g.items.every(it => isRowComplete(g, it));
+              const gBg = groupDone ? '#fef08a' : undefined;
+              return g.items.map((it, idx) => {
+                const rowDone = isRowComplete(g, it);
+                const rBg = groupDone ? '#fef08a' : rowDone ? '#fed7aa' : undefined;
+                return (
+                  <tr key={`${g.グループid}-${it.保険者id}`}
+                    style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
+                    {/* 顧問先名（結合） */}
+                    {idx === 0 && (
+                      <td rowSpan={rs} style={merged(gBg)}>
+                        <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
+                        <button className="btn btn-secondary" style={{display:'block', padding:'2px 8px', fontSize:'12px', marginTop:'6px'}}
+                          onClick={() => setModal({mode:'edit', group:g})}>編集</button>
+                      </td>
+                    )}
+                    {/* 提出先ごとのセル */}
+                    <td style={cell(rBg)}>
+                      <span style={{background: it['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: it['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
+                        {it['区分']}
+                      </span>
                     </td>
-                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['打ち合わせ日'])}</td>
-                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['作成日'])}</td>
-                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['納品日'])}</td>
-                    <td style={mergedTd(rs, {fontSize:'14px'})} rowSpan={rs}>{g['提出方法']}</td>
-                    <td style={mergedTd(rs, {})} rowSpan={rs}>{fmtDate(g['提出日'])}</td>
-                  </>}
-                  {/* 保険者ごとのセル */}
-                  <td style={td()}>
-                    <span style={{background: it['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: it['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
-                      {it['区分']}
-                    </span>
-                  </td>
-                  <td style={td()}>{it['保険者']}</td>
-                  <td style={td()}>{it['サービス種別']}</td>
-                  <td style={td({maxWidth:'120px', overflow:'hidden', textOverflow:'ellipsis'})}>
-                    {it['指定権者URL'] ? <a href={it['指定権者URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
-                  </td>
-                  <td style={td({textAlign:'center'})}>
-                    <input type="checkbox" checked={!!it.OK}
-                      onChange={e => handleOkToggle(g.グループid, it.保険者id, e.target.checked)}
-                      style={{width:'18px', height:'18px', cursor:'pointer'}} />
-                  </td>
-                  {idx === 0 && (
-                    <td style={mergedTd(rs, {})} rowSpan={rs}>
-                      <button className="btn btn-danger" style={{padding:'3px 10px', fontSize:'13px'}}
-                        onClick={() => { if (confirm('削除しますか？')) onDelete(g.グループid); }}>
-                        削除
-                      </button>
+                    <td style={cell(rBg)}>{it['サービス種別']}</td>
+                    <td style={cell(rBg)}>{it['提出先']}</td>
+                    <td style={cell(rBg)}>
+                      {it['提出先URL'] ? <a href={it['提出先URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
                     </td>
-                  )}
-                </tr>
-              ));
+                    {/* 進捗セル（結合） */}
+                    {idx === 0 && <>
+                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['打ち合わせ日'])}</td>
+                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['納品日'])}</td>
+                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px'}}>{g['提出担当']}</td>
+                      <td rowSpan={rs} style={merged(gBg)}>
+                        {g['提出担当'] === '齊藤事務所で提出' ? fmtDate(g['提出日']) : ''}
+                      </td>
+                      <td rowSpan={rs} style={merged(gBg)}>
+                        <button className="btn btn-danger" style={{padding:'3px 10px', fontSize:'13px'}}
+                          onClick={() => { if (confirm('削除しますか？')) onDelete(g.グループid); }}>
+                          削除
+                        </button>
+                      </td>
+                    </>}
+                  </tr>
+                );
+              });
             })}
           </tbody>
         </table>
