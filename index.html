@@ -1,0 +1,800 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>処遇改善加算タスク管理</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    .login-card { background: white; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+
+    body {
+      font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
+      font-size: 19px;
+      color: #000000;
+      line-height: 1.65;
+      font-weight: 500;
+    }
+
+    .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 800; font-size: 19px; }
+    .nav-active  { background-color: #dbeafe; color: #1e3a8a; font-weight: 800; font-size: 19px; }
+    nav a, nav button, .tab-btn { font-size: 19px !important; font-weight: 600 !important; color: #000000; }
+
+    th { position: sticky; top: 0; z-index: 10; font-size: 18px; color: #000000; font-weight: 700; background: #f9fafb; }
+    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 17px !important; color: #000000 !important; font-weight: 500 !important; }
+    table { color: #000000; font-size: 17px; }
+    tr:hover td { background: #eff6ff; }
+
+    .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 260px); }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: center; justify-content: center; }
+    .modal-box { background: white; border-radius: 12px; padding: 32px; width: 680px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
+
+    input, select, textarea {
+      width: 100%; border: 1px solid #9ca3af; border-radius: 6px; padding: 8px 12px;
+      font-size: 17px; font-family: inherit; color: #000000; outline: none; transition: border 0.2s; font-weight: 500;
+    }
+    input:focus, select:focus, textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    input::placeholder, textarea::placeholder { color: #374151; font-weight: 500; }
+
+    .btn { padding: 9px 20px; border-radius: 6px; font-size: 17px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: none; font-family: inherit; }
+    .btn-primary   { background: #2563eb; color: white; }
+    .btn-primary:hover { background: #1d4ed8; }
+    .btn-danger    { background: #dc2626; color: white; }
+    .btn-danger:hover  { background: #b91c1c; }
+    .btn-secondary { background: #f3f4f6; color: #000000; border: 1px solid #9ca3af; }
+    .btn-secondary:hover { background: #e5e7eb; }
+
+    .text-gray-500 { color: #1f2937 !important; font-weight: 500; }
+    .text-gray-600 { color: #111827 !important; font-weight: 500; }
+    .text-sm  { font-size: 15px !important; font-weight: 500; }
+    .text-xs  { font-size: 14px !important; font-weight: 500; }
+
+    .row-done td { opacity: 0.5; }
+    input[type="checkbox"] { width: auto; }
+  </style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div id="root"></div>
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useRef, useCallback } = React;
+
+const ALLOWED_EMAILS = ['hiro@saitoh-sr.com'];
+const GSI_CLIENT_ID = '714632380111-0a9qleqctdripon18t664rsdoafiiq9f.apps.googleusercontent.com';
+const AUTH_SK = 'shogu_app_auth_user';
+const SHEETS_ID_SK = 'shogu_app_sheets_id';
+
+function decodeJwt(token) {
+  try {
+    const payload = token.split('.')[1];
+    const binary  = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    const utf8str = decodeURIComponent(
+      binary.split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+    );
+    const decoded = JSON.parse(utf8str);
+    return { name: decoded.name || decoded.email, email: decoded.email, picture: decoded.picture || '' };
+  } catch(e) { return null; }
+}
+
+function loadAuthUser() {
+  try { const v = sessionStorage.getItem(AUTH_SK); return v ? JSON.parse(v) : null; } catch(e) { return null; }
+}
+function saveAuthUser(user) {
+  try { if (user) sessionStorage.setItem(AUTH_SK, JSON.stringify(user)); else sessionStorage.removeItem(AUTH_SK); } catch(e) {}
+}
+
+/* ══════════════════════════════════════════
+   Google Sheets 連携
+══════════════════════════════════════════ */
+async function sheetsRequest(token, spreadsheetId, path, method = 'GET', body = null) {
+  const opts = {
+    method,
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  };
+  if (body !== null) opts.body = JSON.stringify(body);
+  const url = spreadsheetId
+    ? `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}${path}`
+    : `https://sheets.googleapis.com/v4/spreadsheets${path}`;
+  const res = await fetch(url, opts);
+  if (!res.ok) {
+    const errJson = await res.json().catch(() => ({}));
+    const err = new Error(errJson.error?.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return res.json();
+}
+
+const SHEET_NAMES = {
+  masters:              '顧問先マスタ',
+  shogu_plan:           '処遇改善加算_計画書',
+  shogu_report:         '処遇改善加算_実績報告書',
+  rinji_plan:           '臨時補助金_計画書',
+  rinji_report:         '臨時補助金_実績報告書',
+};
+
+const MASTER_FIELDS   = ['id','顧問先名','業種','処遇改善加算対象'];
+const DELIVERY_FIELDS = ['id','顧問先名','区分','保険者','サービス種別','指定権者URL','打ち合わせ日','作成日','納品日','提出方法','提出日','OK'];
+
+async function createSpreadsheet(token) {
+  const body = {
+    properties: { title: '処遇改善加算タスク管理' },
+    sheets: Object.values(SHEET_NAMES).map(title => ({ properties: { title } })),
+  };
+  const res = await sheetsRequest(token, null, '', 'POST', body);
+  return res.spreadsheetId;
+}
+
+async function ensureSheets(token, spreadsheetId) {
+  const meta = await sheetsRequest(token, spreadsheetId, '');
+  const existing = (meta.sheets || []).map(s => s.properties.title);
+  const missing = Object.values(SHEET_NAMES).filter(n => !existing.includes(n));
+  if (missing.length > 0) {
+    await sheetsRequest(token, spreadsheetId, ':batchUpdate', 'POST', {
+      requests: missing.map(title => ({ addSheet: { properties: { title } } })),
+    });
+  }
+}
+
+async function readSheet(token, spreadsheetId, sheetName, fields) {
+  try {
+    const cols = String.fromCharCode(64 + fields.length);
+    const data = await sheetsRequest(token, spreadsheetId, `/values/${encodeURIComponent(sheetName + '!A1:' + cols)}`);
+    const rows = data.values || [];
+    if (rows.length < 2) return [];
+    const [header, ...dataRows] = rows;
+    return dataRows
+      .filter(r => r.some(c => c !== ''))
+      .map(r => {
+        const obj = {};
+        header.forEach((k, i) => { obj[k] = r[i] ?? ''; });
+        if (obj.id !== '' && obj.id !== undefined) obj.id = Number(obj.id);
+        return obj;
+      });
+  } catch(e) {
+    if (e.status === 400) return [];
+    throw e;
+  }
+}
+
+async function writeSheet(token, spreadsheetId, sheetName, fields, rows) {
+  const values = [
+    fields,
+    ...rows.map(r => fields.map(f => (r[f] != null ? String(r[f]) : ''))),
+  ];
+  await sheetsRequest(token, spreadsheetId, `/values/${encodeURIComponent(sheetName)}:clear`, 'POST');
+  await sheetsRequest(
+    token,
+    spreadsheetId,
+    `/values/${encodeURIComponent(sheetName + '!A1')}?valueInputOption=RAW`,
+    'PUT',
+    { values }
+  );
+}
+
+/* ══════════════════════════════════════════
+   ログイン画面
+══════════════════════════════════════════ */
+function LoginScreen({ onLogin }) {
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const btnRef = useRef(null);
+
+  useEffect(() => {
+    let timer;
+    function initGsi() {
+      if (!window.google) { timer = setTimeout(initGsi, 200); return; }
+      window.google.accounts.id.initialize({
+        client_id: GSI_CLIENT_ID,
+        callback: handleCredential,
+        auto_select: false,
+      });
+      if (btnRef.current) {
+        window.google.accounts.id.renderButton(btnRef.current, {
+          theme: 'outline', size: 'large', text: 'signin_with', locale: 'ja', width: 340,
+        });
+      }
+    }
+    initGsi();
+    return () => clearTimeout(timer);
+  }, []);
+
+  function handleCredential(response) {
+    setLoading(true); setError('');
+    const user = decodeJwt(response.credential);
+    if (!user) { setError('認証情報の取得に失敗しました。'); setLoading(false); return; }
+    if (!ALLOWED_EMAILS.includes(user.email)) {
+      setError(`このアカウント（${user.email}）はアクセスが許可されていません。`);
+      setLoading(false);
+      window.google.accounts.id.disableAutoSelect();
+      return;
+    }
+    saveAuthUser(user);
+    onLogin(user);
+  }
+
+  return (
+    <div style={{minHeight:'100vh', background:'linear-gradient(135deg,#eff6ff 0%,#f0fdf4 100%)', display:'flex', alignItems:'center', justifyContent:'center'}}>
+      <div className="login-card" style={{textAlign:'center'}}>
+        <div style={{fontSize:'42px', marginBottom:'12px'}}>📋</div>
+        <h1 style={{fontSize:'20px', fontWeight:'800', color:'#111827', marginBottom:'6px'}}>処遇改善加算タスク管理</h1>
+        <p style={{fontSize:'15px', color:'#6b7280', marginBottom:'32px'}}>社会保険労務士齊藤事務所</p>
+        <p style={{fontSize:'16px', fontWeight:'600', color:'#374151', marginBottom:'20px'}}>Googleアカウントでログイン</p>
+        <div ref={btnRef} style={{display:'flex', justifyContent:'center', minHeight:'44px', marginBottom:'16px'}}></div>
+        {loading && <p style={{fontSize:'15px', color:'#6b7280', marginTop:'8px'}}>認証中...</p>}
+        {error && (
+          <div style={{background:'#fee2e2', border:'1px solid #fca5a5', borderRadius:'8px', padding:'12px 16px', marginTop:'12px', fontSize:'15px', color:'#991b1b', fontWeight:'600'}}>
+            {error}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   ユーティリティ
+══════════════════════════════════════════ */
+function nextId(rows) {
+  if (!rows || rows.length === 0) return 1;
+  return Math.max(...rows.map(r => Number(r.id) || 0)) + 1;
+}
+
+function fmtDate(v) {
+  if (!v) return '';
+  return v.replace(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/, '$1/$2/$3');
+}
+
+/* ══════════════════════════════════════════
+   顧問先マスタ画面
+══════════════════════════════════════════ */
+const GYOSHU_OPTIONS = ['介護保険', '障害', '介護保険+障害'];
+
+function MasterModal({ initial, onSave, onClose }) {
+  const [form, setForm] = useState(initial || { 顧問先名:'', 業種:'介護保険', 処遇改善加算対象:false });
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'24px'}}>
+          {initial ? '顧問先を編集' : '顧問先を追加'}
+        </h2>
+        <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>顧問先名</label>
+            <input value={form['顧問先名']} onChange={e => set('顧問先名', e.target.value)} placeholder="顧問先名を入力" />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>業種</label>
+            <select value={form['業種']} onChange={e => set('業種', e.target.value)}>
+              {GYOSHU_OPTIONS.map(o => <option key={o}>{o}</option>)}
+            </select>
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
+            <input type="checkbox" id="taisho" checked={!!form['処遇改善加算対象']}
+              onChange={e => set('処遇改善加算対象', e.target.checked)}
+              style={{width:'20px', height:'20px', cursor:'pointer'}} />
+            <label htmlFor="taisho" style={{fontWeight:'700', cursor:'pointer'}}>処遇改善加算対象</label>
+          </div>
+        </div>
+        <div style={{display:'flex', gap:'12px', marginTop:'28px', justifyContent:'flex-end'}}>
+          <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
+          <button className="btn btn-primary" onClick={() => { if (!form['顧問先名'].trim()) return; onSave(form); }}>保存</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MasterView({ masters, onSave, onDelete }) {
+  const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', row}
+
+  function handleSave(form) {
+    if (modal.mode === 'add') {
+      onSave([...masters, { ...form, id: nextId(masters) }]);
+    } else {
+      onSave(masters.map(r => r.id === modal.row.id ? { ...modal.row, ...form } : r));
+    }
+    setModal(null);
+  }
+
+  return (
+    <div>
+      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px', padding:'0 8px'}}>
+        <span style={{fontWeight:'800', fontSize:'20px'}}>顧問先マスタ</span>
+        <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
+      </div>
+      <div className="table-wrap">
+        <table style={{width:'100%', borderCollapse:'collapse'}}>
+          <thead>
+            <tr>
+              {['顧問先名','業種','処遇改善加算対象','操作'].map(h => (
+                <th key={h} style={{padding:'10px 14px', textAlign:'left', borderBottom:'2px solid #e5e7eb'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {masters.length === 0 && (
+              <tr><td colSpan={4} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
+            )}
+            {masters.map(r => (
+              <tr key={r.id} style={{borderBottom:'1px solid #f3f4f6', cursor:'pointer'}} onClick={() => setModal({mode:'edit', row:r})}>
+                <td style={{padding:'10px 14px'}}>{r['顧問先名']}</td>
+                <td style={{padding:'10px 14px'}}>{r['業種']}</td>
+                <td style={{padding:'10px 14px', textAlign:'center'}}>{r['処遇改善加算対象'] === 'true' || r['処遇改善加算対象'] === true ? '✅' : ''}</td>
+                <td style={{padding:'10px 14px'}}>
+                  <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
+                    onClick={e => { e.stopPropagation(); if (confirm('削除しますか？')) onDelete(r.id); }}>
+                    削除
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {modal && (
+        <MasterModal
+          initial={modal.mode === 'edit' ? modal.row : null}
+          onSave={handleSave}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   届出管理 モーダル
+══════════════════════════════════════════ */
+const KUBUN_OPTIONS = ['介護保険', '障害'];
+const TEISHUTSU_OPTIONS = ['自社で提出', '齊藤事務所で提出'];
+
+function DeliveryModal({ initial, masters, isRinji, docType, onSave, onClose }) {
+  const emptyForm = {
+    顧問先名:'', 区分:'介護保険', 保険者:'', サービス種別:'',
+    指定権者URL:'', 打ち合わせ日:'', 作成日:'', 納品日:'',
+    提出方法:'自社で提出', 提出日:'', OK:false,
+  };
+  const [form, setForm] = useState(initial ? {
+    ...initial,
+    OK: initial.OK === 'true' || initial.OK === true,
+  } : emptyForm);
+  const set = (k, v) => setForm(f => ({...f, [k]: v}));
+  const dateLabel = docType === '計画書' ? '計画書作成日' : '実績報告書作成日';
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" onClick={e => e.stopPropagation()}>
+        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'24px'}}>
+          {initial ? '届出を編集' : '届出を追加'}
+        </h2>
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'16px'}}>
+          <div style={{gridColumn:'1/-1'}}>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>顧問先名</label>
+            <select value={form['顧問先名']} onChange={e => set('顧問先名', e.target.value)}>
+              <option value="">-- 選択 --</option>
+              {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>区分</label>
+            <select value={form['区分']} onChange={e => set('区分', e.target.value)}>
+              {KUBUN_OPTIONS.map(o => <option key={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>
+              保険者{isRinji ? '（都道府県のみ）' : '（都道府県または市区町村）'}
+            </label>
+            <input value={form['保険者']} onChange={e => set('保険者', e.target.value)} placeholder="例：東京都" />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>サービス種別</label>
+            <input value={form['サービス種別']} onChange={e => set('サービス種別', e.target.value)} placeholder="例：訪問介護" />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>指定権者URL</label>
+            <input value={form['指定権者URL']} onChange={e => set('指定権者URL', e.target.value)} placeholder="https://..." />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>打ち合わせ日</label>
+            <input type="date" value={form['打ち合わせ日']} onChange={e => set('打ち合わせ日', e.target.value)} />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>{dateLabel}</label>
+            <input type="date" value={form['作成日']} onChange={e => set('作成日', e.target.value)} />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>納品日</label>
+            <input type="date" value={form['納品日']} onChange={e => set('納品日', e.target.value)} />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>提出方法</label>
+            <select value={form['提出方法']} onChange={e => set('提出方法', e.target.value)}>
+              {TEISHUTSU_OPTIONS.map(o => <option key={o}>{o}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>提出日</label>
+            <input type="date" value={form['提出日']} onChange={e => set('提出日', e.target.value)} />
+          </div>
+          <div style={{display:'flex', alignItems:'center', gap:'10px', gridColumn:'1/-1'}}>
+            <input type="checkbox" id="ok-chk" checked={!!form['OK']}
+              onChange={e => set('OK', e.target.checked)}
+              style={{width:'20px', height:'20px', cursor:'pointer'}} />
+            <label htmlFor="ok-chk" style={{fontWeight:'700', cursor:'pointer'}}>OK（完了）</label>
+          </div>
+        </div>
+        <div style={{display:'flex', gap:'12px', marginTop:'28px', justifyContent:'flex-end'}}>
+          <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
+          <button className="btn btn-primary" onClick={() => { if (!form['顧問先名']) return; onSave(form); }}>保存</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   届出管理 テーブル
+══════════════════════════════════════════ */
+function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
+  const [modal, setModal] = useState(null);
+  const [filterOk, setFilterOk] = useState(false);
+
+  const dateLabel = docType === '計画書' ? '計画書作成日' : '実績報告書作成日';
+  const displayed = filterOk ? rows.filter(r => !(r.OK === true || r.OK === 'true')) : rows;
+
+  function handleSave(form) {
+    if (modal.mode === 'add') {
+      onSave([...rows, { ...form, id: nextId(rows) }]);
+    } else {
+      onSave(rows.map(r => r.id === modal.row.id ? { ...modal.row, ...form } : r));
+    }
+    setModal(null);
+  }
+
+  const cols = ['顧問先名','区分','保険者','サービス種別','指定権者URL','打ち合わせ日',dateLabel,'納品日','提出方法','提出日','OK','操作'];
+
+  return (
+    <div>
+      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap'}}>
+        <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
+        <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer'}}>
+          <input type="checkbox" checked={filterOk} onChange={e => setFilterOk(e.target.checked)}
+            style={{width:'18px', height:'18px'}} />
+          完了を非表示
+        </label>
+        <span style={{fontSize:'14px', color:'#6b7280'}}>全{rows.length}件 / 表示{displayed.length}件</span>
+      </div>
+      <div className="table-wrap">
+        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1400px'}}>
+          <thead>
+            <tr>
+              {cols.map(h => (
+                <th key={h} style={{padding:'10px 12px', textAlign:'left', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap'}}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {displayed.length === 0 && (
+              <tr><td colSpan={cols.length} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+            )}
+            {displayed.map(r => {
+              const done = r.OK === true || r.OK === 'true';
+              return (
+                <tr key={r.id} className={done ? 'row-done' : ''} style={{borderBottom:'1px solid #f3f4f6', cursor:'pointer'}}
+                  onClick={() => setModal({mode:'edit', row:r})}>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{r['顧問先名']}</td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>
+                    <span style={{background: r['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: r['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
+                      {r['区分']}
+                    </span>
+                  </td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{r['保険者']}</td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{r['サービス種別']}</td>
+                  <td style={{padding:'8px 12px', maxWidth:'160px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap'}}>
+                    {r['指定権者URL'] ? <a href={r['指定権者URL']} target="_blank" rel="noopener" onClick={e => e.stopPropagation()} style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
+                  </td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['打ち合わせ日'])}</td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['作成日'])}</td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['納品日'])}</td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap', fontSize:'14px'}}>{r['提出方法']}</td>
+                  <td style={{padding:'8px 12px', whiteSpace:'nowrap'}}>{fmtDate(r['提出日'])}</td>
+                  <td style={{padding:'8px 12px', textAlign:'center'}}>
+                    <input type="checkbox" checked={done}
+                      onClick={e => e.stopPropagation()}
+                      onChange={e => {
+                        onSave(rows.map(x => x.id === r.id ? {...x, OK: e.target.checked} : x));
+                      }}
+                      style={{width:'18px', height:'18px', cursor:'pointer'}} />
+                  </td>
+                  <td style={{padding:'8px 12px'}}>
+                    <button className="btn btn-danger" style={{padding:'3px 10px', fontSize:'13px'}}
+                      onClick={ev => { ev.stopPropagation(); if (confirm('削除しますか？')) onDelete(r.id); }}>
+                      削除
+                    </button>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {modal && (
+        <DeliveryModal
+          initial={modal.mode === 'edit' ? modal.row : null}
+          masters={masters}
+          isRinji={isRinji}
+          docType={docType}
+          onSave={handleSave}
+          onClose={() => setModal(null)}
+        />
+      )}
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
+   メインアプリ
+══════════════════════════════════════════ */
+function App() {
+  const [currentUser, setCurrentUser] = useState(() => loadAuthUser());
+
+  /* tabs */
+  const [mainTab, setMainTab] = useState('処遇改善加算'); // '処遇改善加算' | '臨時の補助金'
+  const [subTab,  setSubTab]  = useState('計画書');      // '計画書' | '実績報告書'
+  const [view,    setView]    = useState('delivery');     // 'delivery' | 'master'
+
+  /* data */
+  const [masters,      setMasters]      = useState([]);
+  const [shoguPlan,    setShoguPlan]    = useState([]);
+  const [shoguReport,  setShoguReport]  = useState([]);
+  const [rinjiPlan,    setRinjiPlan]    = useState([]);
+  const [rinjiReport,  setRinjiReport]  = useState([]);
+
+  /* sheets */
+  const [sheetsId,     setSheetsId]     = useState(() => localStorage.getItem(SHEETS_ID_SK) || '');
+  const [syncStatus,   setSyncStatus]   = useState('idle'); // idle|loading|saving|saved|error|noaccess
+  const [syncError,    setSyncError]    = useState('');
+
+  const accessTokenRef = useRef(null);
+  const tokenClientRef = useRef(null);
+
+  /* ── 現在のシート名 ── */
+  const currentSheetName = useMemo(() => {
+    if (mainTab === '処遇改善加算') return subTab === '計画書' ? SHEET_NAMES.shogu_plan    : SHEET_NAMES.shogu_report;
+    return subTab === '計画書' ? SHEET_NAMES.rinji_plan : SHEET_NAMES.rinji_report;
+  }, [mainTab, subTab]);
+
+  const currentRows = useMemo(() => {
+    if (mainTab === '処遇改善加算') return subTab === '計画書' ? shoguPlan    : shoguReport;
+    return subTab === '計画書' ? rinjiPlan : rinjiReport;
+  }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport]);
+
+  const setCurrentRows = useCallback((rows) => {
+    if (mainTab === '処遇改善加算') {
+      if (subTab === '計画書') setShoguPlan(rows); else setShoguReport(rows);
+    } else {
+      if (subTab === '計画書') setRinjiPlan(rows); else setRinjiReport(rows);
+    }
+  }, [mainTab, subTab]);
+
+  /* ── Sheets 全データ読み込み ── */
+  const loadAll = useCallback(async (token, sid) => {
+    const t = token || accessTokenRef.current;
+    const s = sid   || sheetsId;
+    if (!t || !s) return;
+    setSyncStatus('loading'); setSyncError('');
+    try {
+      await ensureSheets(t, s);
+      const [m, sp, sr, rp, rr] = await Promise.all([
+        readSheet(t, s, SHEET_NAMES.masters,       MASTER_FIELDS),
+        readSheet(t, s, SHEET_NAMES.shogu_plan,    DELIVERY_FIELDS),
+        readSheet(t, s, SHEET_NAMES.shogu_report,  DELIVERY_FIELDS),
+        readSheet(t, s, SHEET_NAMES.rinji_plan,    DELIVERY_FIELDS),
+        readSheet(t, s, SHEET_NAMES.rinji_report,  DELIVERY_FIELDS),
+      ]);
+      setMasters(m); setShoguPlan(sp); setShoguReport(sr); setRinjiPlan(rp); setRinjiReport(rr);
+      setSyncStatus('saved');
+    } catch(e) {
+      if (e.status === 401) { tokenClientRef.current?.requestAccessToken({ prompt: '' }); }
+      else { setSyncStatus('error'); setSyncError('読み込みエラー: ' + e.message); }
+    }
+  }, [sheetsId]);
+
+  /* ── Sheets 保存（指定シートのみ） ── */
+  const saveSheet = useCallback(async (sheetName, fields, rows) => {
+    const t = accessTokenRef.current;
+    const s = sheetsId;
+    if (!t || !s) return;
+    setSyncStatus('saving'); setSyncError('');
+    try {
+      await writeSheet(t, s, sheetName, fields, rows);
+      setSyncStatus('saved');
+    } catch(e) {
+      if (e.status === 401) { tokenClientRef.current?.requestAccessToken({ prompt: '' }); }
+      else { setSyncStatus('error'); setSyncError('保存エラー: ' + e.message); }
+    }
+  }, [sheetsId]);
+
+  /* ── スプレッドシート新規作成 ── */
+  const handleCreateSheet = useCallback(async () => {
+    const t = accessTokenRef.current;
+    if (!t) { tokenClientRef.current?.requestAccessToken({ prompt: 'consent' }); return; }
+    setSyncStatus('loading');
+    try {
+      const newId = await createSpreadsheet(t);
+      localStorage.setItem(SHEETS_ID_SK, newId);
+      setSheetsId(newId);
+      setSyncStatus('saved');
+      await loadAll(t, newId);
+    } catch(e) {
+      setSyncStatus('error'); setSyncError('スプレッドシート作成エラー: ' + e.message);
+    }
+  }, [loadAll]);
+
+  /* ── OAuth2 トークン取得 ── */
+  useEffect(() => {
+    if (!currentUser) return;
+    let timer;
+    function initTokenClient() {
+      if (!window.google?.accounts?.oauth2) { timer = setTimeout(initTokenClient, 300); return; }
+      tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
+        client_id: GSI_CLIENT_ID,
+        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
+        callback: (response) => {
+          if (response.error) { setSyncStatus('noaccess'); return; }
+          accessTokenRef.current = response.access_token;
+          const sid = localStorage.getItem(SHEETS_ID_SK) || '';
+          if (sid) { loadAll(response.access_token, sid); }
+          else     { setSyncStatus('noaccess'); }
+        },
+      });
+      tokenClientRef.current.requestAccessToken({ prompt: '' });
+    }
+    initTokenClient();
+    return () => clearTimeout(timer);
+  }, [currentUser?.email, loadAll]);
+
+  /* ── データ変更ハンドラ ── */
+  function handleMastersSave(rows) {
+    setMasters(rows);
+    saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
+  }
+  function handleMasterDelete(id) {
+    const rows = masters.filter(r => r.id !== id);
+    setMasters(rows);
+    saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
+  }
+  function handleDeliverySave(rows) {
+    setCurrentRows(rows);
+    saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
+  }
+  function handleDeliveryDelete(id) {
+    const rows = currentRows.filter(r => r.id !== id);
+    setCurrentRows(rows);
+    saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
+  }
+
+  /* ── ログイン前 ── */
+  if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
+
+  /* ── 同期ステータス表示 ── */
+  function SyncBadge() {
+    const base = {fontSize:'13px', fontWeight:'700', padding:'4px 10px', borderRadius:'5px', fontFamily:'inherit'};
+    if (syncStatus === 'loading') return <span style={{...base, color:'#2563eb'}}>🔄 読込中…</span>;
+    if (syncStatus === 'saving')  return <span style={{...base, color:'#d97706'}}>💾 保存中…</span>;
+    if (syncStatus === 'saved')   return <span style={{...base, color:'#16a34a'}}>✅ 保存済み</span>;
+    if (syncStatus === 'error')   return <span style={{...base, color:'#dc2626'}} title={syncError}>❌ エラー</span>;
+    if (syncStatus === 'noaccess') {
+      if (!sheetsId) {
+        return (
+          <button onClick={handleCreateSheet}
+            style={{...base, border:'1px solid #2563eb', background:'#eff6ff', color:'#1d4ed8', cursor:'pointer'}}>
+            ＋ スプレッドシートを新規作成
+          </button>
+        );
+      }
+      return (
+        <button onClick={() => tokenClientRef.current?.requestAccessToken({ prompt: 'consent' })}
+          style={{...base, border:'1px solid #f97316', background:'#fff7ed', color:'#c2410c', cursor:'pointer'}}>
+          ⚠️ Sheetsと接続
+        </button>
+      );
+    }
+    return null;
+  }
+
+  return (
+    <div style={{minHeight:'100vh', display:'flex', flexDirection:'column'}}>
+      {/* ヘッダー */}
+      <header style={{background:'white', borderBottom:'1px solid #e5e7eb', padding:'10px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'8px'}}>
+        <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
+          <span style={{fontSize:'22px'}}>📋</span>
+          <span style={{fontWeight:'800', fontSize:'19px'}}>処遇改善加算タスク管理</span>
+        </div>
+        <div style={{display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap'}}>
+          <SyncBadge />
+          {sheetsId && (
+            <a href={`https://docs.google.com/spreadsheets/d/${sheetsId}`} target="_blank" rel="noopener"
+              style={{fontSize:'13px', color:'#2563eb', textDecoration:'underline'}}>
+              Sheets
+            </a>
+          )}
+          <button onClick={() => loadAll()} className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px'}}>
+            🔄 更新
+          </button>
+          <span style={{fontSize:'14px', color:'#374151'}}>{currentUser.name}</span>
+          <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px'}}
+            onClick={() => { saveAuthUser(null); setCurrentUser(null); }}>
+            ログアウト
+          </button>
+        </div>
+      </header>
+
+      {/* ナビゲーション */}
+      <nav style={{background:'white', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'0', alignItems:'center'}}>
+        {/* 顧問先マスタ */}
+        <button
+          className={`tab-btn ${view === 'master' ? 'tab-active' : ''}`}
+          style={{padding:'12px 20px', background:'none', border:'none', borderBottom: view==='master' ? '3px solid #2563eb' : '3px solid transparent', cursor:'pointer', marginRight:'8px'}}
+          onClick={() => setView('master')}>
+          顧問先マスタ
+        </button>
+        {/* 大項目タブ */}
+        {['処遇改善加算','臨時の補助金'].map(tab => (
+          <button key={tab}
+            className={`tab-btn ${view==='delivery' && mainTab===tab ? 'tab-active' : ''}`}
+            style={{padding:'12px 20px', background:'none', border:'none', borderBottom: view==='delivery' && mainTab===tab ? '3px solid #2563eb' : '3px solid transparent', cursor:'pointer'}}
+            onClick={() => { setView('delivery'); setMainTab(tab); }}>
+            {tab}
+          </button>
+        ))}
+      </nav>
+
+      {/* 中項目タブ（届出管理のみ） */}
+      {view === 'delivery' && (
+        <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'0'}}>
+          {['計画書','実績報告書'].map(tab => (
+            <button key={tab}
+              className={`tab-btn ${subTab===tab ? 'nav-active' : ''}`}
+              style={{padding:'10px 20px', background: subTab===tab ? '#dbeafe' : 'none', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer', marginRight:'4px'}}
+              onClick={() => setSubTab(tab)}>
+              {tab}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* コンテンツ */}
+      <main style={{flex:1, padding:'16px 20px', overflow:'hidden'}}>
+        {view === 'master' ? (
+          <MasterView masters={masters} onSave={handleMastersSave} onDelete={handleMasterDelete} />
+        ) : (
+          <DeliveryView
+            rows={currentRows}
+            masters={masters}
+            isRinji={mainTab === '臨時の補助金'}
+            docType={subTab}
+            onSave={handleDeliverySave}
+            onDelete={handleDeliveryDelete}
+          />
+        )}
+      </main>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<App />);
+</script>
+</body>
+</html>
