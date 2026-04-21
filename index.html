@@ -298,7 +298,9 @@ function MasterModal({ initial, onSave, onClose }) {
 }
 
 function MasterView({ masters, onSave, onDelete }) {
-  const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', row}
+  const [modal, setModal] = useState(null);
+  const [filterName, setFilterName] = useState('');
+  const [filterGyoshu, setFilterGyoshu] = useState('');
 
   function handleSave(form) {
     if (modal.mode === 'add') {
@@ -309,11 +311,33 @@ function MasterView({ masters, onSave, onDelete }) {
     setModal(null);
   }
 
+  const displayed = masters.filter(r => {
+    if (filterName && !r['顧問先名'].includes(filterName)) return false;
+    if (filterGyoshu && r['業種'] !== filterGyoshu) return false;
+    return true;
+  });
+
+  function gyoshuBadge(g) {
+    if (g === '介護保険')    return {background:'#fff7ed', color:'#c2410c', border:'1px solid #fed7aa'};
+    if (g === '障害')        return {background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0'};
+    return {background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe'};
+  }
+
   return (
     <div>
-      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px', padding:'0 8px'}}>
+      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px', padding:'0 8px', flexWrap:'wrap'}}>
         <span style={{fontWeight:'800', fontSize:'20px'}}>顧問先マスタ</span>
         <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
+      </div>
+      <div style={{display:'flex', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap', alignItems:'center'}}>
+        <input value={filterName} onChange={e => setFilterName(e.target.value)} placeholder="顧問先名で検索"
+          style={{width:'220px', padding:'6px 10px', fontSize:'15px'}} />
+        <select value={filterGyoshu} onChange={e => setFilterGyoshu(e.target.value)}
+          style={{width:'180px', padding:'6px 10px', fontSize:'15px'}}>
+          <option value="">業種（すべて）</option>
+          {GYOSHU_OPTIONS.map(o => <option key={o}>{o}</option>)}
+        </select>
+        <span style={{fontSize:'14px', color:'#6b7280'}}>{displayed.length}件</span>
       </div>
       <div className="table-wrap">
         <table style={{width:'100%', borderCollapse:'collapse'}}>
@@ -325,19 +349,27 @@ function MasterView({ masters, onSave, onDelete }) {
             </tr>
           </thead>
           <tbody>
-            {masters.length === 0 && (
-              <tr><td colSpan={4} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
+            {displayed.length === 0 && (
+              <tr><td colSpan={5} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
             )}
-            {masters.map(r => (
-              <tr key={r.id} style={{borderBottom:'1px solid #f3f4f6', cursor:'pointer'}} onClick={() => setModal({mode:'edit', row:r})}>
+            {displayed.map(r => (
+              <tr key={r.id} style={{borderBottom:'1px solid #f3f4f6'}}>
                 <td style={{padding:'10px 14px'}}>{r['顧問先ナンバー']}</td>
                 <td style={{padding:'10px 14px'}}>{r['顧問先名']}</td>
-                <td style={{padding:'10px 14px'}}>{r['業種']}</td>
-                <td style={{padding:'10px 14px'}}>{r['賃金改善実施期間']}</td>
                 <td style={{padding:'10px 14px'}}>
+                  <span style={{...gyoshuBadge(r['業種']), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
+                    {r['業種']}
+                  </span>
+                </td>
+                <td style={{padding:'10px 14px'}}>{r['賃金改善実施期間']}</td>
+                <td style={{padding:'10px 14px', whiteSpace:'nowrap'}}>
+                  <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
+                    onClick={() => setModal({mode:'edit', row:r})}>
+                    編集
+                  </button>
                   <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
-                    onClick={e => { e.stopPropagation(); if (confirm('削除しますか？')) onDelete(r.id); }}>
-                    削除
+                    onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>
+                    契約解除
                   </button>
                 </td>
               </tr>
@@ -550,12 +582,22 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
    届出管理 テーブル
 ══════════════════════════════════════════ */
 function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
-  const [modal, setModal] = useState(null); // null | {mode:'add'} | {mode:'edit', group}
+  const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
+  const [filterName, setFilterName] = useState('');
+  const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
 
   const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
-  const displayed = filterDone ? groups.filter(g => !g.items.every(it => isRowComplete(g, it))) : groups;
+
+  const displayed = useMemo(() => {
+    let result = groups;
+    if (filterDone)              result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
+    if (filterName)              result = result.filter(g => g.顧問先名 === filterName);
+    if (filterNohon === '入力済み') result = result.filter(g => !!g['納品日']);
+    if (filterNohon === '未入力')   result = result.filter(g => !g['納品日']);
+    return result;
+  }, [groups, filterDone, filterName, filterNohon]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -570,12 +612,25 @@ function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
 
   return (
     <div>
-      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap'}}>
+      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px', padding:'0 8px', flexWrap:'wrap'}}>
         <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
         <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer'}}>
           <input type="checkbox" checked={filterDone} onChange={e => setFilterDone(e.target.checked)} style={{width:'18px', height:'18px'}} />
           完了を非表示
         </label>
+      </div>
+      <div style={{display:'flex', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap', alignItems:'center'}}>
+        <select value={filterName} onChange={e => setFilterName(e.target.value)}
+          style={{width:'220px', padding:'6px 10px', fontSize:'15px'}}>
+          <option value="">顧問先名（すべて）</option>
+          {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
+        </select>
+        <select value={filterNohon} onChange={e => setFilterNohon(e.target.value)}
+          style={{width:'210px', padding:'6px 10px', fontSize:'15px'}}>
+          <option value="">{dateLabel}（すべて）</option>
+          <option value="入力済み">入力済み</option>
+          <option value="未入力">未入力</option>
+        </select>
         <span style={{fontSize:'14px', color:'#6b7280'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
@@ -605,8 +660,6 @@ function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
                     {idx === 0 && (
                       <td rowSpan={rs} style={merged(gBg)}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
-                        <button className="btn btn-secondary" style={{display:'block', padding:'2px 8px', fontSize:'12px', marginTop:'6px'}}
-                          onClick={() => setModal({mode:'edit', group:g})}>編集</button>
                       </td>
                     )}
                     {/* 提出先ごとのセル */}
@@ -629,10 +682,10 @@ function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
                         {g['提出担当'] === '齊藤事務所で提出' ? fmtDate(g['提出日']) : ''}
                       </td>
                       <td rowSpan={rs} style={merged(gBg)}>
-                        <button className="btn btn-danger" style={{padding:'3px 10px', fontSize:'13px'}}
-                          onClick={() => { if (confirm('削除しますか？')) onDelete(g.グループid); }}>
-                          削除
-                        </button>
+                        <button className="btn btn-secondary" style={{display:'block', padding:'3px 10px', fontSize:'13px', marginBottom:'6px'}}
+                          onClick={() => setModal({mode:'edit', group:g})}>編集</button>
+                        <button className="btn btn-danger" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
+                          onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}>取消</button>
                       </td>
                     </>}
                   </tr>
@@ -887,22 +940,42 @@ function App() {
 
       {/* ナビゲーション */}
       <nav style={{background:'white', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'0', alignItems:'center'}}>
+        {/* 処遇改善加算 */}
+        <button className="tab-btn"
+          style={{
+            padding:'12px 20px', border:'none', cursor:'pointer',
+            background:    view==='delivery' && mainTab==='処遇改善加算' ? '#fef9c3' : 'none',
+            borderBottom:  view==='delivery' && mainTab==='処遇改善加算' ? '3px solid #ca8a04' : '3px solid transparent',
+            color:         view==='delivery' && mainTab==='処遇改善加算' ? '#854d0e' : '#111827',
+            fontWeight:    view==='delivery' && mainTab==='処遇改善加算' ? '800' : '600',
+          }}
+          onClick={() => { setView('delivery'); setMainTab('処遇改善加算'); }}>
+          処遇改善加算
+        </button>
+        {/* 臨時の補助金 */}
+        <button className="tab-btn"
+          style={{
+            padding:'12px 20px', border:'none', cursor:'pointer',
+            background:    view==='delivery' && mainTab==='臨時の補助金' ? '#f3e8ff' : 'none',
+            borderBottom:  view==='delivery' && mainTab==='臨時の補助金' ? '3px solid #7c3aed' : '3px solid transparent',
+            color:         view==='delivery' && mainTab==='臨時の補助金' ? '#6b21a8' : '#111827',
+            fontWeight:    view==='delivery' && mainTab==='臨時の補助金' ? '800' : '600',
+          }}
+          onClick={() => { setView('delivery'); setMainTab('臨時の補助金'); }}>
+          臨時の補助金
+        </button>
         {/* 顧問先マスタ */}
-        <button
-          className={`tab-btn ${view === 'master' ? 'tab-active' : ''}`}
-          style={{padding:'12px 20px', background:'none', border:'none', borderBottom: view==='master' ? '3px solid #2563eb' : '3px solid transparent', cursor:'pointer', marginRight:'8px'}}
+        <button className="tab-btn"
+          style={{
+            padding:'12px 20px', border:'none', cursor:'pointer',
+            background:    view==='master' ? '#f0fdf4' : 'none',
+            borderBottom:  view==='master' ? '3px solid #16a34a' : '3px solid transparent',
+            color:         view==='master' ? '#15803d' : '#111827',
+            fontWeight:    view==='master' ? '800' : '600',
+          }}
           onClick={() => setView('master')}>
           顧問先マスタ
         </button>
-        {/* 大項目タブ */}
-        {['処遇改善加算','臨時の補助金'].map(tab => (
-          <button key={tab}
-            className={`tab-btn ${view==='delivery' && mainTab===tab ? 'tab-active' : ''}`}
-            style={{padding:'12px 20px', background:'none', border:'none', borderBottom: view==='delivery' && mainTab===tab ? '3px solid #2563eb' : '3px solid transparent', cursor:'pointer'}}
-            onClick={() => { setView('delivery'); setMainTab(tab); }}>
-            {tab}
-          </button>
-        ))}
       </nav>
 
       {/* 中項目タブ（届出管理のみ） */}
