@@ -87,6 +87,7 @@ const ALLOWED_EMAILS = ['hiro@saitoh-sr.com'];
 const GSI_CLIENT_ID = '714632380111-0a9qleqctdripon18t664rsdoafiiq9f.apps.googleusercontent.com';
 const AUTH_SK = 'shogu_app_auth_user';
 const SHEETS_ID_SK = 'shogu_app_sheets_id';
+const TAB_SK = 'shogu_app_tab';
 
 function decodeJwt(token) {
   try {
@@ -807,11 +808,16 @@ const INITIAL_MASTERS = [
 function App() {
   const [currentUser, setCurrentUser] = useState(() => loadAuthUser());
 
-  /* tabs */
-  const [mainTab,   setMainTab]   = useState('処遇改善加算'); // '処遇改善加算' | '臨時の補助金'
-  const [subTab,    setSubTab]    = useState('計画書');      // '計画書' | '実績報告書'
-  const [view,      setView]      = useState('delivery');     // 'delivery' | 'master'
-  const [selNendo,  setSelNendo]  = useState(CURRENT_FY);
+  /* tabs — localStorage から復元 */
+  const _savedTab = (() => { try { return JSON.parse(localStorage.getItem(TAB_SK)) || {}; } catch(e) { return {}; } })();
+  const [mainTab,   setMainTabRaw]   = useState(_savedTab.mainTab  || '処遇改善加算');
+  const [subTab,    setSubTabRaw]    = useState(_savedTab.subTab   || '計画書');
+  const [view,      setViewRaw]      = useState(_savedTab.view     || 'delivery');
+  const [selNendo,  setSelNendo]     = useState(CURRENT_FY);
+
+  function setMainTab(v)  { setMainTabRaw(v);  try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), mainTab:v}));  } catch(e){} }
+  function setSubTab(v)   { setSubTabRaw(v);   try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), subTab:v}));   } catch(e){} }
+  function setView(v)     { setViewRaw(v);     try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), view:v}));     } catch(e){} }
 
   /* data */
   const [masters,      setMasters]      = useState(INITIAL_MASTERS);
