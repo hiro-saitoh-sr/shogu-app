@@ -345,7 +345,8 @@ function MasterView({ masters, onSave, onDelete }) {
 
   const displayed = masters.filter(r => {
     if (filterName && r['顧問先名'] !== filterName) return false;
-    if (filterGyoshu && r['業種'] !== filterGyoshu) return false;
+    if (filterGyoshu === '介護保険' && r['業種'] !== '介護保険' && r['業種'] !== '介護保険+障害') return false;
+    if (filterGyoshu === '障害'     && r['業種'] !== '障害'     && r['業種'] !== '介護保険+障害') return false;
     return true;
   });
 
@@ -371,9 +372,10 @@ function MasterView({ masters, onSave, onDelete }) {
           {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
         </select>
         <select value={filterGyoshu} onChange={e => setFilterGyoshu(e.target.value)}
-          style={{width:'180px', padding:'6px 10px', fontSize:'16px'}}>
+          style={{width:'160px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">業種（すべて）</option>
-          {GYOSHU_OPTIONS.map(o => <option key={o}>{o}</option>)}
+          <option value="介護保険">介護保険</option>
+          <option value="障害">障害</option>
         </select>
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto'}}>{displayed.length}件</span>
       </div>
@@ -390,39 +392,31 @@ function MasterView({ masters, onSave, onDelete }) {
             {displayed.length === 0 && (
               <tr><td colSpan={5} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
             )}
-            {displayed.flatMap(r => {
-              const isCombo = r['業種'] === '介護保険+障害';
-              const gyoshuList = isCombo ? ['介護保険', '障害'] : [r['業種']];
-              return gyoshuList.map((g, gi) => (
-                <tr key={`${r.id}-${g}`}
-                  style={{borderBottom: (!isCombo || gi === 1) ? '1px solid #e5e7eb' : 'none'}}>
-                  {gi === 0 && <>
-                    <td style={{padding:'10px 14px', verticalAlign:'middle'}} rowSpan={gyoshuList.length}>
-                      {r['顧問先ナンバー']}
-                    </td>
-                    <td style={{padding:'10px 14px', verticalAlign:'middle'}} rowSpan={gyoshuList.length}>
-                      {r['顧問先名']}
-                    </td>
-                  </>}
-                  <td style={{padding:'6px 14px', verticalAlign:'middle'}}>
-                    <span style={{...gyoshuBadge(g), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>
-                      {g}
+            {displayed.map(r => (
+              <tr key={r.id} style={{borderBottom:'1px solid #e5e7eb'}}>
+                <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先ナンバー']}</td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先名']}</td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
+                  {r['業種'] === '介護保険+障害' ? (
+                    <span style={{display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap'}}>
+                      <span style={{...gyoshuBadge('介護保険'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>介護保険</span>
+                      <span style={{...gyoshuBadge('障害'),     padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>障害</span>
                     </span>
-                  </td>
-                  {gi === 0 && <>
-                    <td style={{padding:'10px 14px', verticalAlign:'middle'}} rowSpan={gyoshuList.length}>
-                      {r['賃金改善実施期間']}
-                    </td>
-                    <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}} rowSpan={gyoshuList.length}>
-                      <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
-                        onClick={() => setModal({mode:'edit', row:r})}>編集</button>
-                      <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
-                        onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>契約解除</button>
-                    </td>
-                  </>}
-                </tr>
-              ));
-            })}
+                  ) : (
+                    <span style={{...gyoshuBadge(r['業種']), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>
+                      {r['業種']}
+                    </span>
+                  )}
+                </td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
+                  <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
+                    onClick={() => setModal({mode:'edit', row:r})}>編集</button>
+                  <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
+                    onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>契約解除</button>
+                </td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
