@@ -13,50 +13,69 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
+    /* ── ログイン画面 ── */
     .login-card { background: white; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
+    .login-google-btn { display: flex; align-items: center; justify-content: center; gap: 12px; width: 100%; padding: 12px 24px; border: 2px solid #e5e7eb; border-radius: 8px; background: white; font-size: 17px; font-weight: 700; color: #000000; cursor: pointer; transition: all 0.15s; font-family: inherit; }
+    .login-google-btn:hover { background: #f9fafb; border-color: #9ca3af; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+    .login-google-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
     body {
       font-family: 'Noto Sans JP', 'Hiragino Kaku Gothic ProN', 'Meiryo', sans-serif;
       font-size: 19px;
-      color: #111827;
+      color: #000000;
       line-height: 1.65;
       font-weight: 500;
     }
 
-    .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 800; font-size: 19px; }
-    .nav-active  { background-color: #dbeafe; color: #1e3a8a; font-weight: 800; font-size: 19px; }
-    nav a, nav button, .tab-btn { font-size: 19px !important; font-weight: 600 !important; color: #111827; }
+    /* ── ナビゲーション ── */
+    nav a, nav button, .tab-btn { font-size: 19px !important; font-weight: 600 !important; color: #000000; }
 
-    th { position: sticky; top: 0; z-index: 10; font-size: 18px; color: #111827; font-weight: 700; background: #f9fafb; }
-    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 17px !important; color: #111827 !important; font-weight: 500 !important; }
-    table { color: #111827; font-size: 17px; }
-    tr:hover td { background: #eff6ff; }
+    /* ── テーブル ── */
+    th { position: sticky; top: 0; z-index: 10; font-size: 18px; color: #000000; font-weight: 700; background: #f9fafb; }
+    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 19px !important; color: #000000 !important; font-weight: 500 !important; }
+    table { color: #000000; font-size: 19px; }
+    tr:hover td { background: #ecfdf5; }
 
-    .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 260px); }
+    /* ── レイアウト ── */
+    .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 310px); }
     .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5); z-index: 50; display: flex; align-items: center; justify-content: center; }
     .modal-box { background: white; border-radius: 12px; padding: 32px; width: 680px; max-width: 95vw; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.35); }
 
+    /* ── フォーム ── */
     input, select, textarea {
       width: 100%; border: 1px solid #9ca3af; border-radius: 6px; padding: 8px 12px;
-      font-size: 17px; font-family: inherit; color: #111827; outline: none; transition: border 0.2s; font-weight: 500;
+      font-size: 19px; font-family: inherit; color: #000000; outline: none; transition: border 0.2s; font-weight: 500;
     }
-    input:focus, select:focus, textarea:focus { border-color: #2563eb; box-shadow: 0 0 0 3px rgba(37,99,235,0.15); }
+    input:focus, select:focus, textarea:focus { border-color: #16a34a; box-shadow: 0 0 0 3px rgba(22,163,74,0.15); }
     input::placeholder, textarea::placeholder { color: #374151; font-weight: 500; }
+    select option { color: #000000; font-weight: 500; }
 
-    .btn { padding: 9px 20px; border-radius: 6px; font-size: 17px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: none; font-family: inherit; }
-    .btn-primary   { background: #2563eb; color: white; }
-    .btn-primary:hover { background: #1d4ed8; }
+    /* ── ボタン ── */
+    .btn { padding: 9px 20px; border-radius: 6px; font-size: 19px; font-weight: 700; cursor: pointer; transition: all 0.15s; border: none; font-family: inherit; }
+    .btn-primary   { background: #16a34a; color: white; }
+    .btn-primary:hover { background: #15803d; }
     .btn-danger    { background: #dc2626; color: white; }
     .btn-danger:hover  { background: #b91c1c; }
-    .btn-secondary { background: #f3f4f6; color: #111827; border: 1px solid #9ca3af; }
+    .btn-secondary { background: #f3f4f6; color: #000000; border: 1px solid #9ca3af; }
     .btn-secondary:hover { background: #e5e7eb; }
 
+    /* ── Tailwind グレー文字クラスを上書き（コントラスト強化） ── */
+    .text-gray-300 { color: #4b5563 !important; font-weight: 500; }
+    .text-gray-400 { color: #374151 !important; font-weight: 500; }
     .text-gray-500 { color: #1f2937 !important; font-weight: 500; }
     .text-gray-600 { color: #111827 !important; font-weight: 500; }
-    .text-sm  { font-size: 15px !important; font-weight: 500; }
-    .text-xs  { font-size: 14px !important; font-weight: 500; }
+    .text-gray-700 { color: #000000 !important; font-weight: 500; }
+    .text-gray-800 { color: #000000 !important; font-weight: 500; }
+    .text-gray-900 { color: #000000 !important; font-weight: 500; }
+    .text-sm  { font-size: 17px !important; font-weight: 500; }
+    .text-xs  { font-size: 16px !important; font-weight: 500; }
+    .text-base { font-size: 19px !important; font-weight: 500; }
 
+    /* ── その他 ── */
     input[type="checkbox"] { width: auto; }
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
   </style>
 </head>
 <body class="bg-gray-50 min-h-screen">
@@ -251,6 +270,19 @@ function fmtDate(v) {
   return v.replace(/(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/, '$1/$2/$3');
 }
 
+function fiscalYear(dateStr) {
+  if (!dateStr) return null;
+  const m = dateStr.match(/^(\d{4})[\/\-](\d{1,2})/);
+  if (!m) return null;
+  const y = parseInt(m[1]), mo = parseInt(m[2]);
+  return mo >= 4 ? y : y - 1;
+}
+
+const CURRENT_FY = (() => {
+  const now = new Date();
+  return now.getMonth() >= 3 ? now.getFullYear() : now.getFullYear() - 1;
+})();
+
 /* ══════════════════════════════════════════
    顧問先マスタ画面
 ══════════════════════════════════════════ */
@@ -312,16 +344,18 @@ function MasterView({ masters, onSave, onDelete }) {
   }
 
   const displayed = masters.filter(r => {
-    if (filterName && !r['顧問先名'].includes(filterName)) return false;
+    if (filterName && r['顧問先名'] !== filterName) return false;
     if (filterGyoshu && r['業種'] !== filterGyoshu) return false;
     return true;
   });
 
   function gyoshuBadge(g) {
-    if (g === '介護保険')    return {background:'#fff7ed', color:'#c2410c', border:'1px solid #fed7aa'};
-    if (g === '障害')        return {background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0'};
+    if (g === '介護保険') return {background:'#fff7ed', color:'#c2410c', border:'1px solid #fed7aa'};
+    if (g === '障害')     return {background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0'};
     return {background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe'};
   }
+
+  const thS = {padding:'10px 14px', textAlign:'left', borderBottom:'2px solid #e5e7eb'};
 
   return (
     <div>
@@ -329,22 +363,26 @@ function MasterView({ masters, onSave, onDelete }) {
         <span style={{fontWeight:'800', fontSize:'20px'}}>顧問先マスタ</span>
         <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
       </div>
-      <div style={{display:'flex', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap', alignItems:'center'}}>
-        <input value={filterName} onChange={e => setFilterName(e.target.value)} placeholder="顧問先名で検索"
-          style={{width:'220px', padding:'6px 10px', fontSize:'15px'}} />
+      <div style={{display:'flex', gap:'12px', marginBottom:'14px', padding:'0 8px', flexWrap:'wrap', alignItems:'center', background:'white', border:'1px solid #e5e7eb', borderRadius:'8px', padding:'10px 14px'}}>
+        <span style={{fontSize:'15px', fontWeight:'700', color:'#6b7280', whiteSpace:'nowrap'}}>絞り込み：</span>
+        <select value={filterName} onChange={e => setFilterName(e.target.value)}
+          style={{width:'220px', padding:'6px 10px', fontSize:'16px'}}>
+          <option value="">顧問先名（すべて）</option>
+          {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
+        </select>
         <select value={filterGyoshu} onChange={e => setFilterGyoshu(e.target.value)}
-          style={{width:'180px', padding:'6px 10px', fontSize:'15px'}}>
+          style={{width:'180px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">業種（すべて）</option>
           {GYOSHU_OPTIONS.map(o => <option key={o}>{o}</option>)}
         </select>
-        <span style={{fontSize:'14px', color:'#6b7280'}}>{displayed.length}件</span>
+        <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto'}}>{displayed.length}件</span>
       </div>
       <div className="table-wrap">
         <table style={{width:'100%', borderCollapse:'collapse'}}>
           <thead>
             <tr>
               {['顧問先ナンバー','顧問先名','業種','賃金改善実施期間','操作'].map(h => (
-                <th key={h} style={{padding:'10px 14px', textAlign:'left', borderBottom:'2px solid #e5e7eb'}}>{h}</th>
+                <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
@@ -352,28 +390,39 @@ function MasterView({ masters, onSave, onDelete }) {
             {displayed.length === 0 && (
               <tr><td colSpan={5} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
             )}
-            {displayed.map(r => (
-              <tr key={r.id} style={{borderBottom:'1px solid #f3f4f6'}}>
-                <td style={{padding:'10px 14px'}}>{r['顧問先ナンバー']}</td>
-                <td style={{padding:'10px 14px'}}>{r['顧問先名']}</td>
-                <td style={{padding:'10px 14px'}}>
-                  <span style={{...gyoshuBadge(r['業種']), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
-                    {r['業種']}
-                  </span>
-                </td>
-                <td style={{padding:'10px 14px'}}>{r['賃金改善実施期間']}</td>
-                <td style={{padding:'10px 14px', whiteSpace:'nowrap'}}>
-                  <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
-                    onClick={() => setModal({mode:'edit', row:r})}>
-                    編集
-                  </button>
-                  <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
-                    onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>
-                    契約解除
-                  </button>
-                </td>
-              </tr>
-            ))}
+            {displayed.flatMap(r => {
+              const isCombo = r['業種'] === '介護保険+障害';
+              const gyoshuList = isCombo ? ['介護保険', '障害'] : [r['業種']];
+              return gyoshuList.map((g, gi) => (
+                <tr key={`${r.id}-${g}`}
+                  style={{borderBottom: (!isCombo || gi === 1) ? '1px solid #e5e7eb' : 'none'}}>
+                  {gi === 0 && <>
+                    <td style={{padding:'10px 14px', verticalAlign:'middle'}} rowSpan={gyoshuList.length}>
+                      {r['顧問先ナンバー']}
+                    </td>
+                    <td style={{padding:'10px 14px', verticalAlign:'middle'}} rowSpan={gyoshuList.length}>
+                      {r['顧問先名']}
+                    </td>
+                  </>}
+                  <td style={{padding:'6px 14px', verticalAlign:'middle'}}>
+                    <span style={{...gyoshuBadge(g), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>
+                      {g}
+                    </span>
+                  </td>
+                  {gi === 0 && <>
+                    <td style={{padding:'10px 14px', verticalAlign:'middle'}} rowSpan={gyoshuList.length}>
+                      {r['賃金改善実施期間']}
+                    </td>
+                    <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}} rowSpan={gyoshuList.length}>
+                      <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
+                        onClick={() => setModal({mode:'edit', row:r})}>編集</button>
+                      <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
+                        onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>契約解除</button>
+                    </td>
+                  </>}
+                </tr>
+              ));
+            })}
           </tbody>
         </table>
       </div>
@@ -581,7 +630,7 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
+function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, onSave, onDelete }) {
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
@@ -592,12 +641,19 @@ function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
 
   const displayed = useMemo(() => {
     let result = groups;
+    if (selNendo) {
+      result = result.filter(g => {
+        const fy1 = fiscalYear(g['打ち合わせ日']);
+        const fy  = fy1 !== null ? fy1 : fiscalYear(g['納品日']);
+        return fy === null || fy === selNendo;
+      });
+    }
     if (filterDone)              result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
     if (filterName)              result = result.filter(g => g.顧問先名 === filterName);
     if (filterNohon === '入力済み') result = result.filter(g => !!g['納品日']);
     if (filterNohon === '未入力')   result = result.filter(g => !g['納品日']);
     return result;
-  }, [groups, filterDone, filterName, filterNohon]);
+  }, [groups, selNendo, filterDone, filterName, filterNohon]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -612,26 +668,37 @@ function DeliveryView({ rows, masters, isRinji, docType, onSave, onDelete }) {
 
   return (
     <div>
-      <div style={{display:'flex', alignItems:'center', gap:'12px', marginBottom:'12px', padding:'0 8px', flexWrap:'wrap'}}>
-        <button className="btn btn-primary" style={{padding:'6px 16px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
-        <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer'}}>
-          <input type="checkbox" checked={filterDone} onChange={e => setFilterDone(e.target.checked)} style={{width:'18px', height:'18px'}} />
-          完了を非表示
-        </label>
+      {/* ── ツールバー ── */}
+      <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'10px', flexWrap:'wrap', gap:'10px'}}>
+        {/* 年度スイッチャー */}
+        <div style={{display:'flex', alignItems:'center', background:'white', border:'1px solid #e5e7eb', borderRadius:'8px', overflow:'hidden'}}>
+          <button onClick={() => setSelNendo(n => n - 1)}
+            style={{padding:'7px 14px', background:'none', border:'none', borderRight:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>←</button>
+          <span style={{padding:'4px 18px', fontWeight:'800', color:'#15803d', fontSize:'17px', whiteSpace:'nowrap'}}>{selNendo}年度</span>
+          <button onClick={() => setSelNendo(n => n + 1)}
+            style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
+        </div>
+        <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
       </div>
-      <div style={{display:'flex', gap:'12px', marginBottom:'16px', padding:'0 8px', flexWrap:'wrap', alignItems:'center'}}>
+      {/* ── フィルターバー ── */}
+      <div style={{display:'flex', gap:'10px', marginBottom:'12px', flexWrap:'wrap', alignItems:'center', background:'white', border:'1px solid #e5e7eb', borderRadius:'8px', padding:'10px 14px'}}>
+        <span style={{fontSize:'15px', fontWeight:'700', color:'#6b7280', whiteSpace:'nowrap'}}>絞り込み：</span>
         <select value={filterName} onChange={e => setFilterName(e.target.value)}
-          style={{width:'220px', padding:'6px 10px', fontSize:'15px'}}>
+          style={{width:'220px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">顧問先名（すべて）</option>
           {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
         </select>
         <select value={filterNohon} onChange={e => setFilterNohon(e.target.value)}
-          style={{width:'210px', padding:'6px 10px', fontSize:'15px'}}>
+          style={{width:'210px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">{dateLabel}（すべて）</option>
           <option value="入力済み">入力済み</option>
           <option value="未入力">未入力</option>
         </select>
-        <span style={{fontSize:'14px', color:'#6b7280'}}>全{groups.length}件 / 表示{displayed.length}件</span>
+        <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
+          <input type="checkbox" checked={filterDone} onChange={e => setFilterDone(e.target.checked)} style={{width:'17px', height:'17px'}} />
+          完了を非表示
+        </label>
+        <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
         <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1100px'}}>
@@ -747,9 +814,10 @@ function App() {
   const [currentUser, setCurrentUser] = useState(() => loadAuthUser());
 
   /* tabs */
-  const [mainTab, setMainTab] = useState('処遇改善加算'); // '処遇改善加算' | '臨時の補助金'
-  const [subTab,  setSubTab]  = useState('計画書');      // '計画書' | '実績報告書'
-  const [view,    setView]    = useState('delivery');     // 'delivery' | 'master'
+  const [mainTab,   setMainTab]   = useState('処遇改善加算'); // '処遇改善加算' | '臨時の補助金'
+  const [subTab,    setSubTab]    = useState('計画書');      // '計画書' | '実績報告書'
+  const [view,      setView]      = useState('delivery');     // 'delivery' | 'master'
+  const [selNendo,  setSelNendo]  = useState(CURRENT_FY);
 
   /* data */
   const [masters,      setMasters]      = useState(INITIAL_MASTERS);
@@ -912,79 +980,88 @@ function App() {
   }
 
   return (
-    <div style={{minHeight:'100vh', display:'flex', flexDirection:'column'}}>
-      {/* ヘッダー */}
-      <header style={{background:'white', borderBottom:'1px solid #e5e7eb', padding:'10px 20px', display:'flex', alignItems:'center', justifyContent:'space-between', flexWrap:'wrap', gap:'8px'}}>
-        <div style={{display:'flex', alignItems:'center', gap:'12px'}}>
-          <span style={{fontSize:'22px'}}>📋</span>
-          <span style={{fontWeight:'800', fontSize:'19px'}}>処遇改善加算タスク管理システム</span>
+    <div className="min-h-screen bg-gray-50">
+      {/* ── ヘッダー（タイトル・同期・ナビを統合、sticky） ── */}
+      <header style={{background:'white', borderBottom:'1px solid #e5e7eb', boxShadow:'0 1px 3px rgba(0,0,0,0.08)', padding:'10px 20px 0', position:'sticky', top:0, zIndex:20}}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'8px'}}>
+          {/* タイトル */}
+          <div style={{flexShrink:0}}>
+            <div style={{fontWeight:'800', fontSize:'20px', color:'#000000'}}>処遇改善加算タスク管理システム</div>
+            <div style={{fontSize:'13px', color:'#6b7280', fontWeight:'500'}}>社会保険労務士齊藤事務所</div>
+          </div>
+          {/* 同期ステータス（中央） */}
+          <div style={{flex:1, display:'flex', justifyContent:'center', alignItems:'center', gap:'10px', padding:'0 16px'}}>
+            <SyncBadge />
+            <button onClick={() => loadAll()} title="Sheetsから再読み込み"
+              style={{fontSize:'13px', padding:'3px 10px', borderRadius:'5px', border:'1px solid #d1d5db', background:'#f9fafb', color:'#374151', cursor:'pointer', fontFamily:'inherit', fontWeight:'600'}}>
+              再読込
+            </button>
+            {sheetsId && (
+              <a href={`https://docs.google.com/spreadsheets/d/${sheetsId}`} target="_blank" rel="noopener"
+                style={{fontSize:'13px', color:'#16a34a', textDecoration:'underline'}}>
+                Sheets
+              </a>
+            )}
+          </div>
+          {/* ユーザー情報・ログアウト */}
+          <div style={{display:'flex', alignItems:'center', gap:'12px', flexShrink:0}}>
+            <div style={{textAlign:'right', lineHeight:'1.3'}}>
+              <div style={{fontSize:'15px', fontWeight:'700', color:'#000000'}}>{currentUser.name}</div>
+              <div style={{fontSize:'13px', color:'#6b7280', fontWeight:'500'}}>{currentUser.email}</div>
+            </div>
+            <button onClick={() => { saveAuthUser(null); setCurrentUser(null); }}
+              style={{padding:'6px 14px', fontSize:'14px', fontWeight:'700', borderRadius:'6px', border:'1px solid #d1d5db', background:'#f9fafb', color:'#374151', cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit'}}>
+              ログアウト
+            </button>
+          </div>
         </div>
-        <div style={{display:'flex', alignItems:'center', gap:'12px', flexWrap:'wrap'}}>
-          <SyncBadge />
-          {sheetsId && (
-            <a href={`https://docs.google.com/spreadsheets/d/${sheetsId}`} target="_blank" rel="noopener"
-              style={{fontSize:'13px', color:'#2563eb', textDecoration:'underline'}}>
-              Sheets
-            </a>
-          )}
-          <button onClick={() => loadAll()} className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px'}}>
-            🔄 更新
+
+        {/* ── メインナビゲーション ── */}
+        <nav style={{display:'flex', gap:'2px', overflowX:'auto'}}>
+          <button className="tab-btn"
+            style={{padding:'10px 22px', border:'none', cursor:'pointer', borderRadius:'8px 8px 0 0', whiteSpace:'nowrap',
+              background:   view==='delivery' && mainTab==='処遇改善加算' ? '#fef9c3' : 'transparent',
+              borderBottom: view==='delivery' && mainTab==='処遇改善加算' ? '3px solid #ca8a04' : '3px solid transparent',
+              color:        view==='delivery' && mainTab==='処遇改善加算' ? '#854d0e' : '#000000',
+              fontWeight:   view==='delivery' && mainTab==='処遇改善加算' ? '800' : '600',
+            }}
+            onClick={() => { setView('delivery'); setMainTab('処遇改善加算'); }}>
+            処遇改善加算
           </button>
-          <span style={{fontSize:'14px', color:'#374151'}}>社会保険労務士齊藤事務所</span>
-          <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px'}}
-            onClick={() => { saveAuthUser(null); setCurrentUser(null); }}>
-            ログアウト
+          <button className="tab-btn"
+            style={{padding:'10px 22px', border:'none', cursor:'pointer', borderRadius:'8px 8px 0 0', whiteSpace:'nowrap',
+              background:   view==='delivery' && mainTab==='臨時の補助金' ? '#f3e8ff' : 'transparent',
+              borderBottom: view==='delivery' && mainTab==='臨時の補助金' ? '3px solid #7c3aed' : '3px solid transparent',
+              color:        view==='delivery' && mainTab==='臨時の補助金' ? '#6b21a8' : '#000000',
+              fontWeight:   view==='delivery' && mainTab==='臨時の補助金' ? '800' : '600',
+            }}
+            onClick={() => { setView('delivery'); setMainTab('臨時の補助金'); }}>
+            臨時の補助金
           </button>
-        </div>
+          <button className="tab-btn"
+            style={{padding:'10px 22px', border:'none', cursor:'pointer', borderRadius:'8px 8px 0 0', whiteSpace:'nowrap',
+              background:   view==='master' ? '#f0fdf4' : 'transparent',
+              borderBottom: view==='master' ? '3px solid #16a34a' : '3px solid transparent',
+              color:        view==='master' ? '#15803d' : '#000000',
+              fontWeight:   view==='master' ? '800' : '600',
+            }}
+            onClick={() => setView('master')}>
+            顧問先マスタ
+          </button>
+        </nav>
       </header>
 
-      {/* ナビゲーション */}
-      <nav style={{background:'white', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'0', alignItems:'center'}}>
-        {/* 処遇改善加算 */}
-        <button className="tab-btn"
-          style={{
-            padding:'12px 20px', border:'none', cursor:'pointer',
-            background:    view==='delivery' && mainTab==='処遇改善加算' ? '#fef9c3' : 'none',
-            borderBottom:  view==='delivery' && mainTab==='処遇改善加算' ? '3px solid #ca8a04' : '3px solid transparent',
-            color:         view==='delivery' && mainTab==='処遇改善加算' ? '#854d0e' : '#111827',
-            fontWeight:    view==='delivery' && mainTab==='処遇改善加算' ? '800' : '600',
-          }}
-          onClick={() => { setView('delivery'); setMainTab('処遇改善加算'); }}>
-          処遇改善加算
-        </button>
-        {/* 臨時の補助金 */}
-        <button className="tab-btn"
-          style={{
-            padding:'12px 20px', border:'none', cursor:'pointer',
-            background:    view==='delivery' && mainTab==='臨時の補助金' ? '#f3e8ff' : 'none',
-            borderBottom:  view==='delivery' && mainTab==='臨時の補助金' ? '3px solid #7c3aed' : '3px solid transparent',
-            color:         view==='delivery' && mainTab==='臨時の補助金' ? '#6b21a8' : '#111827',
-            fontWeight:    view==='delivery' && mainTab==='臨時の補助金' ? '800' : '600',
-          }}
-          onClick={() => { setView('delivery'); setMainTab('臨時の補助金'); }}>
-          臨時の補助金
-        </button>
-        {/* 顧問先マスタ */}
-        <button className="tab-btn"
-          style={{
-            padding:'12px 20px', border:'none', cursor:'pointer',
-            background:    view==='master' ? '#f0fdf4' : 'none',
-            borderBottom:  view==='master' ? '3px solid #16a34a' : '3px solid transparent',
-            color:         view==='master' ? '#15803d' : '#111827',
-            fontWeight:    view==='master' ? '800' : '600',
-          }}
-          onClick={() => setView('master')}>
-          顧問先マスタ
-        </button>
-      </nav>
-
-      {/* 中項目タブ（届出管理のみ） */}
+      {/* ── サブタブ（計画書 / 実績報告書） ── */}
       {view === 'delivery' && (
-        <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'0'}}>
+        <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'4px'}}>
           {['計画書','実績報告書'].map(tab => (
-            <button key={tab}
-              className={`tab-btn ${subTab===tab ? 'nav-active' : ''}`}
-              style={{padding:'10px 20px', background: subTab===tab ? '#dbeafe' : 'none', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer', marginRight:'4px'}}
+            <button key={tab} className="tab-btn"
+              style={{padding:'8px 20px', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer',
+                background:   subTab===tab ? '#dcfce7' : 'transparent',
+                borderBottom: subTab===tab ? '2px solid #16a34a' : '2px solid transparent',
+                color:        subTab===tab ? '#15803d' : '#374151',
+                fontWeight:   subTab===tab ? '700' : '500',
+              }}
               onClick={() => setSubTab(tab)}>
               {tab}
             </button>
@@ -992,8 +1069,8 @@ function App() {
         </div>
       )}
 
-      {/* コンテンツ */}
-      <main style={{flex:1, padding:'16px 20px', overflow:'hidden'}}>
+      {/* ── コンテンツ ── */}
+      <div style={{padding:'14px 20px'}}>
         {view === 'master' ? (
           <MasterView masters={masters} onSave={handleMastersSave} onDelete={handleMasterDelete} />
         ) : (
@@ -1002,11 +1079,13 @@ function App() {
             masters={masters}
             isRinji={mainTab === '臨時の補助金'}
             docType={subTab}
+            selNendo={selNendo}
+            setSelNendo={setSelNendo}
             onSave={handleDeliverySave}
             onDelete={handleDeliveryDelete}
           />
         )}
-      </main>
+      </div>
     </div>
   );
 }
