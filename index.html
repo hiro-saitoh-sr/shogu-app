@@ -88,6 +88,7 @@ const GSI_CLIENT_ID = '714632380111-0a9qleqctdripon18t664rsdoafiiq9f.apps.google
 const AUTH_SK = 'shogu_app_auth_user';
 const SHEETS_ID_SK = 'shogu_app_sheets_id';
 const TAB_SK = 'shogu_app_tab';
+const MASTERS_SK = 'shogu_app_masters';
 
 function decodeJwt(token) {
   try {
@@ -875,7 +876,16 @@ function App() {
   function setView(v)     { setViewRaw(v);     try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), view:v}));     } catch(e){} }
 
   /* data */
-  const [masters,      setMasters]      = useState(INITIAL_MASTERS);
+  const [masters, setMasters] = useState(() => {
+    try {
+      const v = localStorage.getItem(MASTERS_SK);
+      if (v) {
+        const parsed = JSON.parse(v);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch(e) {}
+    return INITIAL_MASTERS;
+  });
   const [shoguPlan,    setShoguPlan]    = useState([]);
   const [shoguReport,  setShoguReport]  = useState([]);
   const [rinjiPlan,    setRinjiPlan]    = useState([]);
@@ -924,6 +934,7 @@ function App() {
         readSheet(t, s, SHEET_NAMES.rinji_report,  DELIVERY_FIELDS),
       ]);
       setMasters(m); setShoguPlan(sp); setShoguReport(sr); setRinjiPlan(rp); setRinjiReport(rr);
+      try { localStorage.setItem(MASTERS_SK, JSON.stringify(m)); } catch(e) {}
       setSyncStatus('saved');
     } catch(e) {
       if (e.status === 401) { tokenClientRef.current?.requestAccessToken({ prompt: '' }); }
@@ -986,19 +997,17 @@ function App() {
   }, [currentUser?.email, loadAll]);
 
   /* ── データ変更ハンドラ ── */
-  function handleMastersSave(rows) {
+  function saveMasters(rows) {
     setMasters(rows);
+    try { localStorage.setItem(MASTERS_SK, JSON.stringify(rows)); } catch(e) {}
     saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
   }
+  function handleMastersSave(rows) { saveMasters(rows); }
   function handleMasterDelete(id) {
-    const rows = masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r);
-    setMasters(rows);
-    saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
+    saveMasters(masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r));
   }
   function handleMasterRestore(id) {
-    const rows = masters.map(r => r.id === id ? {...r, 契約解除: ''} : r);
-    setMasters(rows);
-    saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
+    saveMasters(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r));
   }
   function handleDeliverySave(rows) {
     setCurrentRows(rows);
