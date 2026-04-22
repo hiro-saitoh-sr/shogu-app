@@ -140,7 +140,8 @@ const SHEET_NAMES = {
 
 const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
-const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL'];
+const NENDO_OPTIONS   = [2025, 2026, 2027];
 
 async function createSpreadsheet(token) {
   const body = {
@@ -398,16 +399,16 @@ function MasterView({ masters, onSave, onDelete }) {
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先ナンバー']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先名']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
-                  {r['業種'] === '介護保険+障害' ? (
-                    <span style={{display:'flex', gap:'6px', alignItems:'center', flexWrap:'wrap'}}>
-                      <span style={{...gyoshuBadge('介護保険'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>介護保険</span>
-                      <span style={{...gyoshuBadge('障害'),     padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>障害</span>
-                    </span>
-                  ) : (
-                    <span style={{...gyoshuBadge(r['業種']), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block'}}>
-                      {r['業種']}
-                    </span>
-                  )}
+                  <span style={{display:'flex', gap:'6px', alignItems:'center'}}>
+                    {(r['業種'] === '介護保険' || r['業種'] === '介護保険+障害')
+                      ? <span style={{...gyoshuBadge('介護保険'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block', minWidth:'68px', textAlign:'center'}}>介護保険</span>
+                      : <span style={{display:'inline-block', minWidth:'68px'}}>&nbsp;</span>
+                    }
+                    {(r['業種'] === '障害' || r['業種'] === '介護保険+障害')
+                      ? <span style={{...gyoshuBadge('障害'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block', minWidth:'44px', textAlign:'center'}}>障害</span>
+                      : <span style={{display:'inline-block', minWidth:'44px'}}>&nbsp;</span>
+                    }
+                  </span>
                 </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
@@ -447,6 +448,7 @@ function flatToGroups(rows) {
     if (!map.has(gid)) {
       map.set(gid, {
         グループid:   gid,
+        年度:         r['年度']         ?? '',
         顧問先名:     r['顧問先名']     ?? '',
         打ち合わせ日: r['打ち合わせ日'] ?? '',
         納品日:       r['納品日']       ?? '',
@@ -475,6 +477,7 @@ function groupsToFlat(groups) {
         グループid:   g.グループid,
         保険者id:     item.保険者id,
         顧問先名:     g.顧問先名,
+        年度:         g.年度,
         打ち合わせ日: g.打ち合わせ日,
         納品日:       g.納品日,
         提出担当:     g.提出担当,
@@ -503,12 +506,13 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
   const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 提出先:'', サービス種別:'', 提出先URL:'' });
 
   const initGroup = initial || {
-    グループid: null, 顧問先名:'', 打ち合わせ日:'', 納品日:'',
+    グループid: null, 顧問先名:'', 年度:'', 打ち合わせ日:'', 納品日:'',
     提出担当:'自社で提出', 提出日:'', items:[emptyItem()],
   };
 
   const [shared, setShared] = useState({
     顧問先名:     initGroup.顧問先名,
+    年度:         initGroup.年度     ?? '',
     打ち合わせ日: initGroup.打ち合わせ日,
     納品日:       initGroup.納品日,
     提出担当:     initGroup.提出担当,
@@ -546,6 +550,13 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
             <select value={shared['顧問先名']} onChange={e => setS('顧問先名', e.target.value)}>
               <option value="">-- 選択 --</option>
               {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
+            </select>
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>年度</label>
+            <select value={shared['年度']} onChange={e => setS('年度', e.target.value)}>
+              <option value="">-- 選択 --</option>
+              {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}年度</option>)}
             </select>
           </div>
           <div>
@@ -629,6 +640,7 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
+  const [filterNendo, setFilterNendo] = useState('');
   const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
 
   const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
@@ -638,17 +650,19 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
     let result = groups;
     if (selNendo) {
       result = result.filter(g => {
+        if (g['年度']) return Number(g['年度']) === selNendo;
         const fy1 = fiscalYear(g['打ち合わせ日']);
         const fy  = fy1 !== null ? fy1 : fiscalYear(g['納品日']);
         return fy === null || fy === selNendo;
       });
     }
-    if (filterDone)              result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
-    if (filterName)              result = result.filter(g => g.顧問先名 === filterName);
+    if (filterNendo) result = result.filter(g => g['年度'] === filterNendo);
+    if (filterDone)  result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
+    if (filterName)  result = result.filter(g => g.顧問先名 === filterName);
     if (filterNohon === '入力済み') result = result.filter(g => !!g['納品日']);
     if (filterNohon === '未入力')   result = result.filter(g => !g['納品日']);
     return result;
-  }, [groups, selNendo, filterDone, filterName, filterNohon]);
+  }, [groups, selNendo, filterNendo, filterDone, filterName, filterNohon]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -683,6 +697,11 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
           <option value="">顧問先名（すべて）</option>
           {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
         </select>
+        <select value={filterNendo} onChange={e => setFilterNendo(e.target.value)}
+          style={{width:'150px', padding:'6px 10px', fontSize:'16px'}}>
+          <option value="">年度（すべて）</option>
+          {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}年度</option>)}
+        </select>
         <select value={filterNohon} onChange={e => setFilterNohon(e.target.value)}
           style={{width:'210px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">{dateLabel}（すべて）</option>
@@ -696,17 +715,17 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1100px'}}>
+        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
           <thead>
             <tr>
-              {['顧問先名','区分','サービス種別','提出先','提出先URL','打ち合わせ日',dateLabel,'提出担当','提出日','操作'].map(h => (
+              {['顧問先名','年度','区分','サービス種別','提出先','提出先URL','打ち合わせ日',dateLabel,'提出担当','提出日','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={10} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={11} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
@@ -718,10 +737,15 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
-                    {/* 顧問先名（結合） */}
+                    {/* 顧問先名・年度（結合） */}
                     {idx === 0 && (
                       <td rowSpan={rs} style={merged(gBg)}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
+                      </td>
+                    )}
+                    {idx === 0 && (
+                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'15px', fontWeight:'700', color:'#15803d'}}>
+                        {g['年度'] ? `${g['年度']}年度` : ''}
                       </td>
                     )}
                     {/* 提出先ごとのセル */}
