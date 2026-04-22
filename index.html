@@ -138,9 +138,9 @@ const SHEET_NAMES = {
   rinji_report:         '臨時補助金_実績報告書',
 };
 
-const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間'];
+const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間','契約解除'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
-const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL','取消'];
 const NENDO_OPTIONS   = [2025, 2026, 2027];
 
 async function createSpreadsheet(token) {
@@ -331,10 +331,11 @@ function MasterModal({ initial, onSave, onClose }) {
   );
 }
 
-function MasterView({ masters, onSave, onDelete }) {
+function MasterView({ masters, onSave, onDelete, onRestore }) {
   const [modal, setModal] = useState(null);
   const [filterName, setFilterName] = useState('');
   const [filterGyoshu, setFilterGyoshu] = useState('');
+  const [showCancelled, setShowCancelled] = useState(false);
 
   function handleSave(form) {
     if (modal.mode === 'add') {
@@ -346,6 +347,7 @@ function MasterView({ masters, onSave, onDelete }) {
   }
 
   const displayed = masters.filter(r => {
+    if (!showCancelled && r['契約解除'] === '1') return false;
     if (filterName && r['顧問先名'] !== filterName) return false;
     if (filterGyoshu === '介護保険' && r['業種'] !== '介護保険' && r['業種'] !== '介護保険+障害') return false;
     if (filterGyoshu === '障害'     && r['業種'] !== '障害'     && r['業種'] !== '介護保険+障害') return false;
@@ -379,6 +381,10 @@ function MasterView({ masters, onSave, onDelete }) {
           <option value="介護保険">介護保険</option>
           <option value="障害">障害</option>
         </select>
+        <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
+          <input type="checkbox" checked={showCancelled} onChange={e => setShowCancelled(e.target.checked)} style={{width:'17px', height:'17px'}} />
+          契約解除済みを表示
+        </label>
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto'}}>{displayed.length}件</span>
       </div>
       <div className="table-wrap">
@@ -395,9 +401,9 @@ function MasterView({ masters, onSave, onDelete }) {
               <tr><td colSpan={5} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
             )}
             {displayed.map(r => (
-              <tr key={r.id} style={{borderBottom:'1px solid #e5e7eb'}}>
+              <tr key={r.id} style={{borderBottom:'1px solid #e5e7eb', ...(r['契約解除']==='1' ? {background:'#f3f4f6', opacity:0.65} : {})}}>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先ナンバー']}</td>
-                <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先名']}</td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle', ...(r['契約解除']==='1' ? {textDecoration:'line-through', color:'#6b7280'} : {})}}>{r['顧問先名']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
                   <span style={{display:'inline-flex', gap:'6px', alignItems:'center'}}>
                     <span style={{display:'inline-flex', width:'72px', justifyContent:'center'}}>
@@ -414,10 +420,17 @@ function MasterView({ masters, onSave, onDelete }) {
                 </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
-                  <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
-                    onClick={() => setModal({mode:'edit', row:r})}>編集</button>
-                  <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
-                    onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>契約解除</button>
+                  {r['契約解除'] === '1' ? (
+                    <button className="btn btn-primary" style={{padding:'4px 12px', fontSize:'14px'}}
+                      onClick={() => onRestore(r.id)}>復活</button>
+                  ) : (
+                    <>
+                      <button className="btn btn-secondary" style={{padding:'4px 12px', fontSize:'14px', marginRight:'6px'}}
+                        onClick={() => setModal({mode:'edit', row:r})}>編集</button>
+                      <button className="btn btn-danger" style={{padding:'4px 12px', fontSize:'14px'}}
+                        onClick={() => { if (confirm('契約解除しますか？')) onDelete(r.id); }}>契約解除</button>
+                    </>
+                  )}
                 </td>
               </tr>
             ))}
@@ -450,6 +463,7 @@ function flatToGroups(rows) {
     if (!map.has(gid)) {
       map.set(gid, {
         グループid:   gid,
+        取消:         r['取消']         ?? '',
         年度:         r['年度']         ?? '',
         顧問先名:     r['顧問先名']     ?? '',
         打ち合わせ日: r['打ち合わせ日'] ?? '',
@@ -480,6 +494,7 @@ function groupsToFlat(groups) {
         保険者id:     item.保険者id,
         顧問先名:     g.顧問先名,
         年度:         g.年度,
+        取消:         g.取消,
         打ち合わせ日: g.打ち合わせ日,
         納品日:       g.納品日,
         提出担当:     g.提出担当,
@@ -638,12 +653,13 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, onSave, onDelete }) {
+function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, onSave, onDelete, onRestore }) {
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
   const [filterNendo, setFilterNendo] = useState('');
   const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
+  const [showCancelled, setShowCancelled] = useState(false);
 
   const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
@@ -658,13 +674,14 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
         return fy === null || fy === selNendo;
       });
     }
+    if (!showCancelled) result = result.filter(g => g['取消'] !== '1');
     if (filterNendo) result = result.filter(g => g['年度'] === filterNendo);
     if (filterDone)  result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
     if (filterName)  result = result.filter(g => g.顧問先名 === filterName);
     if (filterNohon === '入力済み') result = result.filter(g => !!g['納品日']);
     if (filterNohon === '未入力')   result = result.filter(g => !g['納品日']);
     return result;
-  }, [groups, selNendo, filterNendo, filterDone, filterName, filterNohon]);
+  }, [groups, selNendo, showCancelled, filterNendo, filterDone, filterName, filterNohon]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -714,6 +731,10 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
           <input type="checkbox" checked={filterDone} onChange={e => setFilterDone(e.target.checked)} style={{width:'17px', height:'17px'}} />
           完了を非表示
         </label>
+        <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
+          <input type="checkbox" checked={showCancelled} onChange={e => setShowCancelled(e.target.checked)} style={{width:'17px', height:'17px'}} />
+          取消済みを表示
+        </label>
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
@@ -731,11 +752,12 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
             )}
             {displayed.map(g => {
               const rs = g.items.length;
-              const groupDone = g.items.every(it => isRowComplete(g, it));
-              const gBg = groupDone ? '#fef08a' : undefined;
+              const cancelled = g['取消'] === '1';
+              const groupDone = !cancelled && g.items.every(it => isRowComplete(g, it));
+              const gBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : undefined);
               return g.items.map((it, idx) => {
-                const rowDone = isRowComplete(g, it);
-                const rBg = groupDone ? '#fef08a' : rowDone ? '#fed7aa' : undefined;
+                const rowDone = !cancelled && isRowComplete(g, it);
+                const rBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : rowDone ? '#fed7aa' : undefined);
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
@@ -770,10 +792,17 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
                         {g['提出担当'] === '齊藤事務所で提出' ? fmtDate(g['提出日']) : ''}
                       </td>
                       <td rowSpan={rs} style={merged(gBg)}>
-                        <button className="btn btn-secondary" style={{display:'block', padding:'3px 10px', fontSize:'13px', marginBottom:'6px'}}
-                          onClick={() => setModal({mode:'edit', group:g})}>編集</button>
-                        <button className="btn btn-danger" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
-                          onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}>取消</button>
+                        {cancelled ? (
+                          <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
+                            onClick={() => onRestore(g.グループid)}>復活</button>
+                        ) : (
+                          <>
+                            <button className="btn btn-secondary" style={{display:'block', padding:'3px 10px', fontSize:'13px', marginBottom:'6px'}}
+                              onClick={() => setModal({mode:'edit', group:g})}>編集</button>
+                            <button className="btn btn-danger" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
+                              onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}>取消</button>
+                          </>
+                        )}
                       </td>
                     </>}
                   </tr>
@@ -962,7 +991,12 @@ function App() {
     saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
   }
   function handleMasterDelete(id) {
-    const rows = masters.filter(r => r.id !== id);
+    const rows = masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r);
+    setMasters(rows);
+    saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
+  }
+  function handleMasterRestore(id) {
+    const rows = masters.map(r => r.id === id ? {...r, 契約解除: ''} : r);
     setMasters(rows);
     saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
   }
@@ -971,7 +1005,12 @@ function App() {
     saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
   }
   function handleDeliveryDelete(gid) {
-    const rows = currentRows.filter(r => Number(r['グループid'] ?? r['id'] ?? 0) !== gid);
+    const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: '1'} : r);
+    setCurrentRows(rows);
+    saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
+  }
+  function handleDeliveryRestore(gid) {
+    const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: ''} : r);
     setCurrentRows(rows);
     saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
   }
@@ -1098,7 +1137,7 @@ function App() {
       {/* ── コンテンツ ── */}
       <div style={{padding:'14px 20px'}}>
         {view === 'master' ? (
-          <MasterView masters={masters} onSave={handleMastersSave} onDelete={handleMasterDelete} />
+          <MasterView masters={masters} onSave={handleMastersSave} onDelete={handleMasterDelete} onRestore={handleMasterRestore} />
         ) : (
           <DeliveryView
             rows={currentRows}
@@ -1109,6 +1148,7 @@ function App() {
             setSelNendo={setSelNendo}
             onSave={handleDeliverySave}
             onDelete={handleDeliveryDelete}
+            onRestore={handleDeliveryRestore}
           />
         )}
       </div>
