@@ -399,15 +399,17 @@ function MasterView({ masters, onSave, onDelete }) {
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先ナンバー']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先名']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
-                  <span style={{display:'flex', gap:'6px', alignItems:'center'}}>
-                    {(r['業種'] === '介護保険' || r['業種'] === '介護保険+障害')
-                      ? <span style={{...gyoshuBadge('介護保険'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block', minWidth:'68px', textAlign:'center'}}>介護保険</span>
-                      : <span style={{display:'inline-block', minWidth:'68px'}}>&nbsp;</span>
-                    }
-                    {(r['業種'] === '障害' || r['業種'] === '介護保険+障害')
-                      ? <span style={{...gyoshuBadge('障害'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', display:'inline-block', minWidth:'44px', textAlign:'center'}}>障害</span>
-                      : <span style={{display:'inline-block', minWidth:'44px'}}>&nbsp;</span>
-                    }
+                  <span style={{display:'inline-flex', gap:'6px', alignItems:'center'}}>
+                    <span style={{display:'inline-flex', width:'72px', justifyContent:'center'}}>
+                      {(r['業種'] === '介護保険' || r['業種'] === '介護保険+障害') && (
+                        <span style={{...gyoshuBadge('介護保険'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', whiteSpace:'nowrap'}}>介護保険</span>
+                      )}
+                    </span>
+                    <span style={{display:'inline-flex', width:'50px', justifyContent:'center'}}>
+                      {(r['業種'] === '障害' || r['業種'] === '介護保険+障害') && (
+                        <span style={{...gyoshuBadge('障害'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', whiteSpace:'nowrap'}}>障害</span>
+                      )}
+                    </span>
                   </span>
                 </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
