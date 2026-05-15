@@ -8,13 +8,14 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     /* ── ログイン画面 ── */
     .login-card { background: white; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
@@ -173,8 +174,17 @@ function LoginScreen({ onLogin }) {
       window.google.accounts.id.disableAutoSelect();
       return;
     }
-    saveAuthUser(user);
-    onLogin(user);
+    // Firebase Auth にも同時サインイン（RTDB セキュリティルール通過のため必須）
+    const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    firebase.auth().signInWithCredential(credential)
+      .then(() => {
+        saveAuthUser(user);
+        onLogin(user);
+      })
+      .catch((err) => {
+        setError('Firebase認証に失敗しました: ' + err.message);
+        setLoading(false);
+      });
   }
 
   return (
@@ -819,39 +829,50 @@ function App() {
   const [rinjiReport,  setRinjiReport]  = useState([]);
   const [syncStatus,   setSyncStatus]   = useState('loading'); // loading|connected|error
 
-  /* ── Firebase リスナー設定（ログイン後） ── */
+  /* ── Firebase リスナー設定（Firebase Auth 確認後に起動） ── */
   useEffect(() => {
     if (!currentUser) return;
 
     setSyncStatus('loading');
 
-    const mastersRef      = db.ref('shogu/masters');
-    const shoguPlanRef    = db.ref('shogu/deliveries/shoguPlan');
-    const shoguReportRef  = db.ref('shogu/deliveries/shoguReport');
-    const rinjiPlanRef    = db.ref('shogu/deliveries/rinjiPlan');
-    const rinjiReportRef  = db.ref('shogu/deliveries/rinjiReport');
+    const refs = {
+      masters:     db.ref('shogu/masters'),
+      shoguPlan:   db.ref('shogu/deliveries/shoguPlan'),
+      shoguReport: db.ref('shogu/deliveries/shoguReport'),
+      rinjiPlan:   db.ref('shogu/deliveries/rinjiPlan'),
+      rinjiReport: db.ref('shogu/deliveries/rinjiReport'),
+    };
 
-    mastersRef.on('value', (snap) => {
-      const arr = snapToArray(snap);
-      if (arr === null) {
-        mastersRef.set(INITIAL_MASTERS);
-      } else {
-        setMasters(arr);
-        setSyncStatus('connected');
-      }
-    }, () => setSyncStatus('error'));
+    let listenersActive = false;
 
-    shoguPlanRef.on('value',   (snap) => { setShoguPlan(snapToArray(snap)   || []); }, () => {});
-    shoguReportRef.on('value', (snap) => { setShoguReport(snapToArray(snap) || []); }, () => {});
-    rinjiPlanRef.on('value',   (snap) => { setRinjiPlan(snapToArray(snap)   || []); }, () => {});
-    rinjiReportRef.on('value', (snap) => { setRinjiReport(snapToArray(snap) || []); }, () => {});
+    function startListeners() {
+      if (listenersActive) return;
+      listenersActive = true;
+
+      refs.masters.on('value', (snap) => {
+        const arr = snapToArray(snap);
+        if (arr === null) {
+          refs.masters.set(INITIAL_MASTERS);
+        } else {
+          setMasters(arr);
+          setSyncStatus('connected');
+        }
+      }, () => setSyncStatus('error'));
+
+      refs.shoguPlan.on('value',   (snap) => { setShoguPlan(snapToArray(snap)   || []); }, () => {});
+      refs.shoguReport.on('value', (snap) => { setShoguReport(snapToArray(snap) || []); }, () => {});
+      refs.rinjiPlan.on('value',   (snap) => { setRinjiPlan(snapToArray(snap)   || []); }, () => {});
+      refs.rinjiReport.on('value', (snap) => { setRinjiReport(snapToArray(snap) || []); }, () => {});
+    }
+
+    // Firebase Auth の状態復元を待ってからリスナーを起動（ページリロード時の権限エラー防止）
+    const unsubAuth = firebase.auth().onAuthStateChanged((firebaseUser) => {
+      if (firebaseUser) startListeners();
+    });
 
     return () => {
-      mastersRef.off();
-      shoguPlanRef.off();
-      shoguReportRef.off();
-      rinjiPlanRef.off();
-      rinjiReportRef.off();
+      unsubAuth();
+      Object.values(refs).forEach(r => r.off());
     };
   }, [currentUser?.email]);
 
@@ -920,7 +941,7 @@ function App() {
               <div style={{fontSize:'15px', fontWeight:'700', color:'#000000'}}>{currentUser.name}</div>
               <div style={{fontSize:'13px', color:'#6b7280', fontWeight:'500'}}>{currentUser.email}</div>
             </div>
-            <button onClick={() => { saveAuthUser(null); setCurrentUser(null); }}
+            <button onClick={() => { firebase.auth().signOut(); saveAuthUser(null); setCurrentUser(null); }}
               style={{padding:'6px 14px', fontSize:'14px', fontWeight:'700', borderRadius:'6px', border:'1px solid #d1d5db', background:'#f9fafb', color:'#374151', cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit'}}>
               ログアウト
             </button>
