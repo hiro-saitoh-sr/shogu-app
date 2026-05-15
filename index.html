@@ -11,6 +11,17 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
+  <script>
+    const _fbApp = firebase.initializeApp({
+      apiKey:      ["AIz","aSyCPnCda2xdHc5jOLEbNT0y","VV4yrJddtmJw"].join(''),
+      authDomain:  "task-app-493716.firebaseapp.com",
+      databaseURL: "https://task-app-493716-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId:   "task-app-493716",
+      appId:       "1:714632380111:web:8daa412c877c12358c81ba",
+    });
+    const db     = _fbApp.database();
+    const fbAuth = _fbApp.auth();
+  </script>
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
@@ -84,17 +95,6 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 <div id="root"></div>
-
-<script>
-firebase.initializeApp({
-  apiKey: ["AIz","aSyCPnCda2xdHc5jOLEbNT0y","VV4yrJddtmJw"].join(''),
-  authDomain: "task-app-493716.firebaseapp.com",
-  databaseURL: "https://task-app-493716-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "task-app-493716",
-  appId: "1:714632380111:web:8daa412c877c12358c81ba"
-});
-const db = firebase.database();
-</script>
 
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
@@ -175,16 +175,10 @@ function LoginScreen({ onLogin }) {
       return;
     }
     // Firebase Auth にも同時サインイン（RTDB セキュリティルール通過のため必須）
-    const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
-    firebase.auth().signInWithCredential(credential)
-      .then(() => {
-        saveAuthUser(user);
-        onLogin(user);
-      })
-      .catch((err) => {
-        setError('Firebase認証に失敗しました: ' + err.message);
-        setLoading(false);
-      });
+    const fbCredential = firebase.auth.GoogleAuthProvider.credential(response.credential);
+    fbAuth.signInWithCredential(fbCredential)
+      .then(() => { saveAuthUser(user); onLogin(user); })
+      .catch((err) => { setError('Firebase認証エラー: ' + err.message); setLoading(false); });
   }
 
   return (
@@ -866,8 +860,8 @@ function App() {
     }
 
     // Firebase Auth の状態復元を待ってからリスナーを起動（ページリロード時の権限エラー防止）
-    const unsubAuth = firebase.auth().onAuthStateChanged((firebaseUser) => {
-      if (firebaseUser) startListeners();
+    const unsubAuth = fbAuth.onAuthStateChanged((fbUser) => {
+      if (fbUser) startListeners();
     });
 
     return () => {
@@ -941,7 +935,7 @@ function App() {
               <div style={{fontSize:'15px', fontWeight:'700', color:'#000000'}}>{currentUser.name}</div>
               <div style={{fontSize:'13px', color:'#6b7280', fontWeight:'500'}}>{currentUser.email}</div>
             </div>
-            <button onClick={() => { firebase.auth().signOut(); saveAuthUser(null); setCurrentUser(null); }}
+            <button onClick={() => { fbAuth.signOut(); saveAuthUser(null); setCurrentUser(null); }}
               style={{padding:'6px 14px', fontSize:'14px', fontWeight:'700', borderRadius:'6px', border:'1px solid #d1d5db', background:'#f9fafb', color:'#374151', cursor:'pointer', whiteSpace:'nowrap', fontFamily:'inherit'}}>
               ログアウト
             </button>
