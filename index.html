@@ -135,7 +135,7 @@ function snapToArray(snap) {
 
 const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間','契約解除'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
-const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL','取消'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL','取消','deadlineDate','submittedDate'];
 const NENDO_OPTIONS   = [2025, 2026, 2027];
 
 /* ══════════════════════════════════════════
@@ -412,6 +412,8 @@ function flatToGroups(rows) {
         納品日:       r['納品日']       ?? '',
         提出担当:     r['提出担当'] || r['提出方法'] || '自社で提出',
         提出日:       r['提出日']       ?? '',
+        deadlineDate:  r['deadlineDate']  ?? '',
+        submittedDate: r['submittedDate'] ?? '',
         items: [],
       });
       order.push(gid);
@@ -441,6 +443,8 @@ function groupsToFlat(groups) {
         納品日:       g.納品日       ?? '',
         提出担当:     g.提出担当     ?? '',
         提出日:       g.提出日       ?? '',
+        deadlineDate:  g.deadlineDate  ?? '',
+        submittedDate: g.submittedDate ?? '',
         区分:         item.区分         ?? '',
         提出先:       item.提出先       ?? '',
         サービス種別: item.サービス種別 ?? '',
@@ -466,7 +470,7 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
 
   const initGroup = initial || {
     グループid: null, 顧問先名:'', 年度:'', 打ち合わせ日:'', 納品日:'',
-    提出担当:'自社で提出', 提出日:'', items:[emptyItem()],
+    提出担当:'自社で提出', 提出日:'', deadlineDate:'', submittedDate:'', items:[emptyItem()],
   };
 
   const [shared, setShared] = useState({
@@ -476,6 +480,8 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
     納品日:       initGroup.納品日,
     提出担当:     initGroup.提出担当,
     提出日:       initGroup.提出日,
+    deadlineDate:  initGroup.deadlineDate  ?? '',
+    submittedDate: initGroup.submittedDate ?? '',
   });
   const [items, setItems] = useState(initGroup.items.length > 0 ? initGroup.items : [emptyItem()]);
 
@@ -534,10 +540,18 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
           </div>
           {shared['提出担当'] === '齊藤事務所で提出' && (
             <div>
-              <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>担当提出日</label>
               <input type="date" value={shared['提出日']} onChange={e => setS('提出日', e.target.value)} />
             </div>
           )}
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出期日</label>
+            <input type="date" value={shared['deadlineDate']} onChange={e => setS('deadlineDate', e.target.value)} />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
+            <input type="date" value={shared['submittedDate']} onChange={e => setS('submittedDate', e.target.value)} />
+          </div>
         </div>
 
         {/* 提出先リスト */}
@@ -690,14 +704,14 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
         <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
           <thead>
             <tr>
-              {['顧問先名','年度','区分','サービス種別','提出先','提出先URL','打ち合わせ日',dateLabel,'提出担当','提出日','操作'].map(h => (
+              {['顧問先名','年度','区分','サービス種別','提出先','提出先URL','打ち合わせ日',dateLabel,'提出担当','担当提出日','提出期日','提出日','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={11} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={13} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
@@ -740,6 +754,8 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
                       <td rowSpan={rs} style={merged(gBg)}>
                         {g['提出担当'] === '齊藤事務所で提出' ? fmtDate(g['提出日']) : ''}
                       </td>
+                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['deadlineDate'])}</td>
+                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['submittedDate'])}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
                           <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
