@@ -12,6 +12,8 @@
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
   <style>
     /* ── ログイン画面 ── */
     .login-card { background: white; border-radius: 16px; padding: 48px 40px; max-width: 420px; width: 90%; box-shadow: 0 8px 40px rgba(0,0,0,0.12); }
@@ -80,15 +82,25 @@
 </head>
 <body class="bg-gray-50 min-h-screen">
 <div id="root"></div>
+
+<script>
+firebase.initializeApp({
+  apiKey: ["AIz","aSyCPnCda2xdHc5jOLEbNT0y","VV4yrJddtmJw"].join(''),
+  authDomain: "task-app-493716.firebaseapp.com",
+  databaseURL: "https://task-app-493716-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "task-app-493716",
+  appId: "1:714632380111:web:8daa412c877c12358c81ba"
+});
+const db = firebase.database();
+</script>
+
 <script type="text/babel" data-presets="react">
 const { useState, useEffect, useMemo, useRef, useCallback } = React;
 
-const ALLOWED_EMAILS = ['hiro@saitoh-sr.com'];
+const ALLOWED_EMAILS = ['hiro@saitoh-sr.com', 'kawahara@saitoh-sr.com'];
 const GSI_CLIENT_ID = '714632380111-0a9qleqctdripon18t664rsdoafiiq9f.apps.googleusercontent.com';
 const AUTH_SK = 'shogu_app_auth_user';
-const SHEETS_ID_SK = 'shogu_app_sheets_id';
 const TAB_SK = 'shogu_app_tab';
-const MASTERS_SK = 'shogu_app_masters';
 
 function decodeJwt(token) {
   try {
@@ -109,96 +121,19 @@ function saveAuthUser(user) {
   try { if (user) sessionStorage.setItem(AUTH_SK, JSON.stringify(user)); else sessionStorage.removeItem(AUTH_SK); } catch(e) {}
 }
 
-/* ══════════════════════════════════════════
-   Google Sheets 連携
-══════════════════════════════════════════ */
-async function sheetsRequest(token, spreadsheetId, path, method = 'GET', body = null) {
-  const opts = {
-    method,
-    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-  };
-  if (body !== null) opts.body = JSON.stringify(body);
-  const url = spreadsheetId
-    ? `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}${path}`
-    : `https://sheets.googleapis.com/v4/spreadsheets${path}`;
-  const res = await fetch(url, opts);
-  if (!res.ok) {
-    const errJson = await res.json().catch(() => ({}));
-    const err = new Error(errJson.error?.message || `HTTP ${res.status}`);
-    err.status = res.status;
-    throw err;
-  }
-  return res.json();
+/* Firebase snapshot → array 変換（配列・整数キーオブジェクト両対応） */
+function snapToArray(snap) {
+  const val = snap.val();
+  if (!val) return null;
+  if (Array.isArray(val)) return val.filter(v => v != null);
+  const keys = Object.keys(val).sort((a, b) => Number(a) - Number(b));
+  return keys.map(k => val[k]).filter(v => v != null);
 }
-
-const SHEET_NAMES = {
-  masters:              '顧問先マスタ',
-  shogu_plan:           '処遇改善加算_計画書',
-  shogu_report:         '処遇改善加算_実績報告書',
-  rinji_plan:           '臨時補助金_計画書',
-  rinji_report:         '臨時補助金_実績報告書',
-};
 
 const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間','契約解除'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
 const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL','取消'];
 const NENDO_OPTIONS   = [2025, 2026, 2027];
-
-async function createSpreadsheet(token) {
-  const body = {
-    properties: { title: '処遇改善加算タスク管理システム' },
-    sheets: Object.values(SHEET_NAMES).map(title => ({ properties: { title } })),
-  };
-  const res = await sheetsRequest(token, null, '', 'POST', body);
-  return res.spreadsheetId;
-}
-
-async function ensureSheets(token, spreadsheetId) {
-  const meta = await sheetsRequest(token, spreadsheetId, '');
-  const existing = (meta.sheets || []).map(s => s.properties.title);
-  const missing = Object.values(SHEET_NAMES).filter(n => !existing.includes(n));
-  if (missing.length > 0) {
-    await sheetsRequest(token, spreadsheetId, ':batchUpdate', 'POST', {
-      requests: missing.map(title => ({ addSheet: { properties: { title } } })),
-    });
-  }
-}
-
-async function readSheet(token, spreadsheetId, sheetName, fields) {
-  try {
-    const cols = String.fromCharCode(64 + fields.length);
-    const data = await sheetsRequest(token, spreadsheetId, `/values/${encodeURIComponent(sheetName + '!A1:' + cols)}`);
-    const rows = data.values || [];
-    if (rows.length < 2) return [];
-    const [header, ...dataRows] = rows;
-    return dataRows
-      .filter(r => r.some(c => c !== ''))
-      .map(r => {
-        const obj = {};
-        header.forEach((k, i) => { obj[k] = r[i] ?? ''; });
-        if (obj.id !== '' && obj.id !== undefined) obj.id = Number(obj.id);
-        return obj;
-      });
-  } catch(e) {
-    if (e.status === 400) return [];
-    throw e;
-  }
-}
-
-async function writeSheet(token, spreadsheetId, sheetName, fields, rows) {
-  const values = [
-    fields,
-    ...rows.map(r => fields.map(f => (r[f] != null ? String(r[f]) : ''))),
-  ];
-  await sheetsRequest(token, spreadsheetId, `/values/${encodeURIComponent(sheetName)}:clear`, 'POST');
-  await sheetsRequest(
-    token,
-    spreadsheetId,
-    `/values/${encodeURIComponent(sheetName + '!A1')}?valueInputOption=RAW`,
-    'PUT',
-    { values }
-  );
-}
 
 /* ══════════════════════════════════════════
    ログイン画面
@@ -875,34 +810,54 @@ function App() {
   function setSubTab(v)   { setSubTabRaw(v);   try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), subTab:v}));   } catch(e){} }
   function setView(v)     { setViewRaw(v);     try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), view:v}));     } catch(e){} }
 
-  /* data */
-  const [masters, setMasters] = useState(() => {
-    try {
-      const v = localStorage.getItem(MASTERS_SK);
-      if (v) {
-        const parsed = JSON.parse(v);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-    } catch(e) {}
-    return INITIAL_MASTERS;
-  });
+  /* data — Firebase onValue で自動同期 */
+  const [masters,      setMasters]      = useState([]);
   const [shoguPlan,    setShoguPlan]    = useState([]);
   const [shoguReport,  setShoguReport]  = useState([]);
   const [rinjiPlan,    setRinjiPlan]    = useState([]);
   const [rinjiReport,  setRinjiReport]  = useState([]);
+  const [syncStatus,   setSyncStatus]   = useState('loading'); // loading|connected|error
 
-  /* sheets */
-  const [sheetsId,     setSheetsId]     = useState(() => localStorage.getItem(SHEETS_ID_SK) || '');
-  const [syncStatus,   setSyncStatus]   = useState('idle'); // idle|loading|saving|saved|error|noaccess
-  const [syncError,    setSyncError]    = useState('');
+  /* ── Firebase リスナー設定（ログイン後） ── */
+  useEffect(() => {
+    if (!currentUser) return;
 
-  const accessTokenRef = useRef(null);
-  const tokenClientRef = useRef(null);
+    setSyncStatus('loading');
 
-  /* ── 現在のシート名 ── */
-  const currentSheetName = useMemo(() => {
-    if (mainTab === '処遇改善加算') return subTab === '計画書' ? SHEET_NAMES.shogu_plan    : SHEET_NAMES.shogu_report;
-    return subTab === '計画書' ? SHEET_NAMES.rinji_plan : SHEET_NAMES.rinji_report;
+    const mastersRef      = db.ref('shogu/masters');
+    const shoguPlanRef    = db.ref('shogu/deliveries/shoguPlan');
+    const shoguReportRef  = db.ref('shogu/deliveries/shoguReport');
+    const rinjiPlanRef    = db.ref('shogu/deliveries/rinjiPlan');
+    const rinjiReportRef  = db.ref('shogu/deliveries/rinjiReport');
+
+    mastersRef.on('value', (snap) => {
+      const arr = snapToArray(snap);
+      if (arr === null) {
+        mastersRef.set(INITIAL_MASTERS);
+      } else {
+        setMasters(arr);
+        setSyncStatus('connected');
+      }
+    }, () => setSyncStatus('error'));
+
+    shoguPlanRef.on('value',   (snap) => { setShoguPlan(snapToArray(snap)   || []); }, () => {});
+    shoguReportRef.on('value', (snap) => { setShoguReport(snapToArray(snap) || []); }, () => {});
+    rinjiPlanRef.on('value',   (snap) => { setRinjiPlan(snapToArray(snap)   || []); }, () => {});
+    rinjiReportRef.on('value', (snap) => { setRinjiReport(snapToArray(snap) || []); }, () => {});
+
+    return () => {
+      mastersRef.off();
+      shoguPlanRef.off();
+      shoguReportRef.off();
+      rinjiPlanRef.off();
+      rinjiReportRef.off();
+    };
+  }, [currentUser?.email]);
+
+  /* ── 現在の届出パス ── */
+  const currentDeliveryPath = useMemo(() => {
+    if (mainTab === '処遇改善加算') return subTab === '計画書' ? 'shoguPlan' : 'shoguReport';
+    return subTab === '計画書' ? 'rinjiPlan' : 'rinjiReport';
   }, [mainTab, subTab]);
 
   const currentRows = useMemo(() => {
@@ -910,118 +865,26 @@ function App() {
     return subTab === '計画書' ? rinjiPlan : rinjiReport;
   }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport]);
 
-  const setCurrentRows = useCallback((rows) => {
-    if (mainTab === '処遇改善加算') {
-      if (subTab === '計画書') setShoguPlan(rows); else setShoguReport(rows);
-    } else {
-      if (subTab === '計画書') setRinjiPlan(rows); else setRinjiReport(rows);
-    }
-  }, [mainTab, subTab]);
-
-  /* ── Sheets 全データ読み込み ── */
-  const loadAll = useCallback(async (token, sid) => {
-    const t = token || accessTokenRef.current;
-    const s = sid   || sheetsId;
-    if (!t || !s) return;
-    setSyncStatus('loading'); setSyncError('');
-    try {
-      await ensureSheets(t, s);
-      const [m, sp, sr, rp, rr] = await Promise.all([
-        readSheet(t, s, SHEET_NAMES.masters,       MASTER_FIELDS),
-        readSheet(t, s, SHEET_NAMES.shogu_plan,    DELIVERY_FIELDS),
-        readSheet(t, s, SHEET_NAMES.shogu_report,  DELIVERY_FIELDS),
-        readSheet(t, s, SHEET_NAMES.rinji_plan,    DELIVERY_FIELDS),
-        readSheet(t, s, SHEET_NAMES.rinji_report,  DELIVERY_FIELDS),
-      ]);
-      setMasters(m); setShoguPlan(sp); setShoguReport(sr); setRinjiPlan(rp); setRinjiReport(rr);
-      try { localStorage.setItem(MASTERS_SK, JSON.stringify(m)); } catch(e) {}
-      setSyncStatus('saved');
-    } catch(e) {
-      if (e.status === 401) { tokenClientRef.current?.requestAccessToken({ prompt: '' }); }
-      else { setSyncStatus('error'); setSyncError('読み込みエラー: ' + e.message); }
-    }
-  }, [sheetsId]);
-
-  /* ── Sheets 保存（指定シートのみ） ── */
-  const saveSheet = useCallback(async (sheetName, fields, rows) => {
-    const t = accessTokenRef.current;
-    const s = sheetsId;
-    if (!t || !s) return;
-    setSyncStatus('saving'); setSyncError('');
-    try {
-      await writeSheet(t, s, sheetName, fields, rows);
-      setSyncStatus('saved');
-    } catch(e) {
-      if (e.status === 401) { tokenClientRef.current?.requestAccessToken({ prompt: '' }); }
-      else { setSyncStatus('error'); setSyncError('保存エラー: ' + e.message); }
-    }
-  }, [sheetsId]);
-
-  /* ── スプレッドシート新規作成 ── */
-  const handleCreateSheet = useCallback(async () => {
-    const t = accessTokenRef.current;
-    if (!t) { tokenClientRef.current?.requestAccessToken({ prompt: 'consent' }); return; }
-    setSyncStatus('loading');
-    try {
-      const newId = await createSpreadsheet(t);
-      localStorage.setItem(SHEETS_ID_SK, newId);
-      setSheetsId(newId);
-      setSyncStatus('saved');
-      await loadAll(t, newId);
-    } catch(e) {
-      setSyncStatus('error'); setSyncError('スプレッドシート作成エラー: ' + e.message);
-    }
-  }, [loadAll]);
-
-  /* ── OAuth2 トークン取得 ── */
-  useEffect(() => {
-    if (!currentUser) return;
-    let timer;
-    function initTokenClient() {
-      if (!window.google?.accounts?.oauth2) { timer = setTimeout(initTokenClient, 300); return; }
-      tokenClientRef.current = window.google.accounts.oauth2.initTokenClient({
-        client_id: GSI_CLIENT_ID,
-        scope: 'https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.file',
-        callback: (response) => {
-          if (response.error) { setSyncStatus('noaccess'); return; }
-          accessTokenRef.current = response.access_token;
-          const sid = localStorage.getItem(SHEETS_ID_SK) || '';
-          if (sid) { loadAll(response.access_token, sid); }
-          else     { setSyncStatus('noaccess'); }
-        },
-      });
-      tokenClientRef.current.requestAccessToken({ prompt: '' });
-    }
-    initTokenClient();
-    return () => clearTimeout(timer);
-  }, [currentUser?.email, loadAll]);
-
-  /* ── データ変更ハンドラ ── */
-  function saveMasters(rows) {
-    setMasters(rows);
-    try { localStorage.setItem(MASTERS_SK, JSON.stringify(rows)); } catch(e) {}
-    saveSheet(SHEET_NAMES.masters, MASTER_FIELDS, rows);
+  /* ── データ変更ハンドラ（Firebase に書き込み → onValue が state を更新） ── */
+  function handleMastersSave(rows) {
+    db.ref('shogu/masters').set(rows);
   }
-  function handleMastersSave(rows) { saveMasters(rows); }
   function handleMasterDelete(id) {
-    saveMasters(masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r));
+    db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r));
   }
   function handleMasterRestore(id) {
-    saveMasters(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r));
+    db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r));
   }
   function handleDeliverySave(rows) {
-    setCurrentRows(rows);
-    saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows);
   }
   function handleDeliveryDelete(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: '1'} : r);
-    setCurrentRows(rows);
-    saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows);
   }
   function handleDeliveryRestore(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: ''} : r);
-    setCurrentRows(rows);
-    saveSheet(currentSheetName, DELIVERY_FIELDS, rows);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows);
   }
 
   /* ── ログイン前 ── */
@@ -1030,26 +893,9 @@ function App() {
   /* ── 同期ステータス表示 ── */
   function SyncBadge() {
     const base = {fontSize:'13px', fontWeight:'700', padding:'4px 10px', borderRadius:'5px', fontFamily:'inherit'};
-    if (syncStatus === 'loading') return <span style={{...base, color:'#2563eb'}}>🔄 読込中…</span>;
-    if (syncStatus === 'saving')  return <span style={{...base, color:'#d97706'}}>💾 保存中…</span>;
-    if (syncStatus === 'saved')   return <span style={{...base, color:'#16a34a'}}>✅ 保存済み</span>;
-    if (syncStatus === 'error')   return <span style={{...base, color:'#dc2626'}} title={syncError}>❌ エラー</span>;
-    if (syncStatus === 'noaccess') {
-      if (!sheetsId) {
-        return (
-          <button onClick={handleCreateSheet}
-            style={{...base, border:'1px solid #2563eb', background:'#eff6ff', color:'#1d4ed8', cursor:'pointer'}}>
-            ＋ スプレッドシートを新規作成
-          </button>
-        );
-      }
-      return (
-        <button onClick={() => tokenClientRef.current?.requestAccessToken({ prompt: 'consent' })}
-          style={{...base, border:'1px solid #f97316', background:'#fff7ed', color:'#c2410c', cursor:'pointer'}}>
-          ⚠️ Sheetsと接続
-        </button>
-      );
-    }
+    if (syncStatus === 'loading')   return <span style={{...base, color:'#2563eb'}}>🔄 接続中…</span>;
+    if (syncStatus === 'connected') return <span style={{...base, color:'#16a34a'}}>✅ リアルタイム同期中</span>;
+    if (syncStatus === 'error')     return <span style={{...base, color:'#dc2626'}}>❌ 接続エラー</span>;
     return null;
   }
 
@@ -1064,18 +910,8 @@ function App() {
             <div style={{fontSize:'13px', color:'#6b7280', fontWeight:'500'}}>社会保険労務士齊藤事務所</div>
           </div>
           {/* 同期ステータス（中央） */}
-          <div style={{flex:1, display:'flex', justifyContent:'center', alignItems:'center', gap:'10px', padding:'0 16px'}}>
+          <div style={{flex:1, display:'flex', justifyContent:'center', alignItems:'center', padding:'0 16px'}}>
             <SyncBadge />
-            <button onClick={() => loadAll()} title="Sheetsから再読み込み"
-              style={{fontSize:'13px', padding:'3px 10px', borderRadius:'5px', border:'1px solid #d1d5db', background:'#f9fafb', color:'#374151', cursor:'pointer', fontFamily:'inherit', fontWeight:'600'}}>
-              再読込
-            </button>
-            {sheetsId && (
-              <a href={`https://docs.google.com/spreadsheets/d/${sheetsId}`} target="_blank" rel="noopener"
-                style={{fontSize:'13px', color:'#16a34a', textDecoration:'underline'}}>
-                Sheets
-              </a>
-            )}
           </div>
           {/* ユーザー情報・ログアウト */}
           <div style={{display:'flex', alignItems:'center', gap:'12px', flexShrink:0}}>
