@@ -547,7 +547,14 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
           <button className="btn btn-secondary" style={{padding:'3px 12px', fontSize:'14px'}} onClick={addItem}>＋ 行を追加</button>
         </div>
         <div style={{overflowX:'auto', marginBottom:'20px', border:'1px solid #e5e7eb', borderRadius:'6px'}}>
-          <table style={{width:'100%', borderCollapse:'collapse', minWidth:'560px'}}>
+          <table style={{width:'100%', borderCollapse:'collapse', minWidth:'700px', tableLayout:'fixed'}}>
+            <colgroup>
+              <col style={{width:'12%'}} />
+              <col style={{width:'18%'}} />
+              <col style={{width:'18%'}} />
+              <col style={{width:'47%'}} />
+              <col style={{width:'5%'}} />
+            </colgroup>
             <thead>
               <tr>
                 {['区分','提出先（保険者）','サービス種別','提出先URL',''].map(h => (
@@ -559,20 +566,20 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
               {items.map((it, idx) => (
                 <tr key={it.保険者id} style={{borderBottom:'1px solid #f3f4f6'}}>
                   <td style={tdStyle}>
-                    <select value={it['区分']} onChange={e => setItem(idx,'区分',e.target.value)} style={{width:'100px'}}>
+                    <select value={it['区分']} onChange={e => setItem(idx,'区分',e.target.value)} style={{width:'100%'}}>
                       {KUBUN_OPTIONS.map(o => <option key={o}>{o}</option>)}
                     </select>
                   </td>
                   <td style={tdStyle}>
-                    <input value={it['提出先']} onChange={e => setItem(idx,'提出先',e.target.value)} placeholder="例：東京都" style={{width:'110px'}} />
+                    <input value={it['提出先']} onChange={e => setItem(idx,'提出先',e.target.value)} placeholder="例：東京都" style={{width:'100%'}} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={it['サービス種別']} onChange={e => setItem(idx,'サービス種別',e.target.value)} placeholder="例：訪問介護" style={{width:'110px'}} />
+                    <input value={it['サービス種別']} onChange={e => setItem(idx,'サービス種別',e.target.value)} placeholder="例：訪問介護" style={{width:'100%'}} />
                   </td>
                   <td style={tdStyle}>
-                    <input value={it['提出先URL']} onChange={e => setItem(idx,'提出先URL',e.target.value)} placeholder="https://..." style={{width:'140px'}} />
+                    <input value={it['提出先URL']} onChange={e => setItem(idx,'提出先URL',e.target.value)} placeholder="https://..." style={{width:'100%'}} />
                   </td>
-                  <td style={tdStyle}>
+                  <td style={{...tdStyle, textAlign:'center'}}>
                     {items.length > 1 && (
                       <button className="btn btn-danger" style={{padding:'2px 8px', fontSize:'13px'}} onClick={() => removeItem(idx)}>✕</button>
                     )}
