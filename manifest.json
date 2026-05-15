@@ -1,0 +1,15 @@
+{
+  "name": "処遇改善加算タスク管理システム",
+  "short_name": "処遇改善",
+  "start_url": "/shogu-app/",
+  "display": "standalone",
+  "background_color": "#16a34a",
+  "theme_color": "#16a34a",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
