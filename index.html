@@ -432,19 +432,19 @@ function groupsToFlat(groups) {
   groups.forEach(g => {
     g.items.forEach(item => {
       flat.push({
-        グループid:   g.グループid,
-        保険者id:     item.保険者id,
-        顧問先名:     g.顧問先名,
-        年度:         g.年度,
-        取消:         g.取消,
-        打ち合わせ日: g.打ち合わせ日,
-        納品日:       g.納品日,
-        提出担当:     g.提出担当,
-        提出日:       g.提出日,
-        区分:         item.区分,
-        提出先:       item.提出先,
-        サービス種別: item.サービス種別,
-        提出先URL:    item.提出先URL,
+        グループid:   g.グループid   ?? 0,
+        保険者id:     item.保険者id  ?? 0,
+        顧問先名:     g.顧問先名     ?? '',
+        年度:         g.年度         ?? '',
+        取消:         g.取消         ?? '',
+        打ち合わせ日: g.打ち合わせ日 ?? '',
+        納品日:       g.納品日       ?? '',
+        提出担当:     g.提出担当     ?? '',
+        提出日:       g.提出日       ?? '',
+        区分:         item.区分         ?? '',
+        提出先:       item.提出先       ?? '',
+        サービス種別: item.サービス種別 ?? '',
+        提出先URL:    item.提出先URL    ?? '',
       });
     });
   });
@@ -884,24 +884,24 @@ function App() {
 
   /* ── データ変更ハンドラ（Firebase に書き込み → onValue が state を更新） ── */
   function handleMastersSave(rows) {
-    db.ref('shogu/masters').set(rows);
+    db.ref('shogu/masters').set(rows).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleMasterDelete(id) {
-    db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r));
+    db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: '1'} : r)).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleMasterRestore(id) {
-    db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r));
+    db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r)).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliverySave(rows) {
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryDelete(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: '1'} : r);
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryRestore(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: ''} : r);
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
   }
 
   /* ── ログイン前 ── */
