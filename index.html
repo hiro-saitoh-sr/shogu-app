@@ -782,21 +782,21 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
   }
 
   function handleCopyFromPrevYear() {
-    if (!filterNendo) return;
-    const srcNendo = String(Number(filterNendo) - 1);
-    const srcGroups = flatToGroups(rows.filter(r => r['年度'] === srcNendo && r['取消'] !== '1'));
+    const dstNendo = String(selNendo);
+    const srcNendo = String(selNendo - 1);
+    const srcGroups = flatToGroups(rows.filter(r => String(r['年度']) === srcNendo && r['取消'] !== '1'));
     if (srcGroups.length === 0) { alert(`${srcNendo}年度の計画書が見つかりません`); return; }
-    if (!confirm(`${srcNendo}年度の計画書を${filterNendo}年度にコピーします。よろしいですか？`)) return;
-    const newGroups = makeCopiedGroups(srcGroups, filterNendo, rows);
+    if (!confirm(`${srcNendo}年度の計画書を${dstNendo}年度にコピーします。よろしいですか？`)) return;
+    const newGroups = makeCopiedGroups(srcGroups, dstNendo, rows);
     onSave(groupsToFlat([...flatToGroups(rows), ...newGroups]));
   }
 
   function handleCopyFromPlan() {
-    if (!filterNendo) return;
-    const srcGroups = flatToGroups((planRows || []).filter(r => r['年度'] === filterNendo && r['取消'] !== '1'));
-    if (srcGroups.length === 0) { alert(`${filterNendo}年度の計画書が見つかりません`); return; }
-    if (!confirm(`${filterNendo}年度の計画書を${docType}にコピーします。よろしいですか？`)) return;
-    const newGroups = makeCopiedGroups(srcGroups, filterNendo, rows);
+    const nendo = String(selNendo);
+    const srcGroups = flatToGroups((planRows || []).filter(r => String(r['年度']) === nendo && r['取消'] !== '1'));
+    if (srcGroups.length === 0) { alert(`${nendo}年度の計画書が見つかりません`); return; }
+    if (!confirm(`${nendo}年度の計画書を${docType}にコピーします。よろしいですか？`)) return;
+    const newGroups = makeCopiedGroups(srcGroups, nendo, rows);
     onSave(groupsToFlat([...flatToGroups(rows), ...newGroups]));
   }
 
@@ -816,25 +816,23 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <button onClick={() => setSelNendo(n => n + 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
-        {docType === '計画書' ? (
+        {!isRinji && (docType === '計画書' ? (
           <button
             className="btn btn-secondary"
-            style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
-            disabled={!filterNendo}
-            title={filterNendo ? `${Number(filterNendo)-1}年度からコピー` : '先に年度で絞り込んでください'}
+            style={{padding:'6px 18px'}}
+            title={`${selNendo - 1}年度の計画書を${selNendo}年度にコピー`}
             onClick={handleCopyFromPrevYear}>
             前年度からコピー
           </button>
         ) : (
           <button
             className="btn btn-secondary"
-            style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
-            disabled={!filterNendo}
-            title={filterNendo ? `${filterNendo}年度の計画書からコピー` : '先に年度で絞り込んでください'}
+            style={{padding:'6px 18px'}}
+            title={`${selNendo}年度の計画書を${docType}にコピー`}
             onClick={handleCopyFromPlan}>
             計画書からコピー
           </button>
-        )}
+        ))}
         <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add', defaultNendo: String(selNendo)})}>＋ 追加</button>
       </div>
       {/* ── フィルターバー ── */}
