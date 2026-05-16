@@ -410,6 +410,12 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
 ══════════════════════════════════════════ */
 const KUBUN_OPTIONS = ['介護保険', '障害'];
 const TEISHUTSU_OPTIONS = ['自社', '齊藤事務所'];
+function kubunBadgeStyle(kubun) {
+  if (kubun === '介護保険') return {background:'#fff7ed', color:'#ea580c', border:'1px solid #fed7aa'};
+  if (kubun === '障害')     return {background:'#f0fdf4', color:'#16a34a', border:'1px solid #bbf7d0'};
+  if (kubun === '医療')     return {background:'#fdf2f8', color:'#db2777', border:'1px solid #fbcfe8'};
+  return {background:'#f3f4f6', color:'#374151', border:'1px solid #d1d5db'};
+}
 function normalizeTeishutsu(v) {
   if (!v || v === '自社で提出') return '自社';
   if (v === '齊藤事務所で提出') return '齊藤事務所';
@@ -1023,7 +1029,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     )}
                     {/* 提出先ごとのセル（区分〜提出期日） */}
                     <td style={cell(rBg)}>
-                      <span style={{background: it['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: it['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
+                      <span style={{...kubunBadgeStyle(it['区分']), padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
                         {it['区分']}
                       </span>
                     </td>
