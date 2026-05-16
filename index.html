@@ -317,10 +317,7 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
   });
 
   function gyoshuBadge(g) {
-    if (g === '介護保険') return {background:'#fff7ed', color:'#c2410c', border:'1px solid #fed7aa'};
-    if (g === '障害')     return {background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0'};
-    if (g === '医療')     return {background:'#f0f9ff', color:'#0369a1', border:'1px solid #bae6fd'};
-    return {background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe'};
+    return kubunBadgeStyle(g);
   }
 
   const thS = {padding:'10px 14px', textAlign:'left', borderBottom:'2px solid #e5e7eb'};
