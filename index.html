@@ -425,6 +425,7 @@ function flatToGroups(rows) {
       提出先:       r['提出先'] || r['保険者'] || '',
       サービス種別: r['サービス種別']  ?? '',
       提出先URL:    r['提出先URL'] || r['指定権者URL'] || '',
+      deadlineDate: r['deadlineDate']  ?? '',
     });
   });
   return order.map(gid => map.get(gid));
@@ -445,7 +446,7 @@ function groupsToFlat(groups) {
         納品日:        g.納品日        ?? '',
         提出担当:      g.提出担当      ?? '',
         提出日:        g.提出日        ?? '',
-        deadlineDate:  g.deadlineDate  ?? '',
+        deadlineDate:  item.deadlineDate ?? '',
         submittedDate: g.submittedDate ?? '',
         区分:         item.区分         ?? '',
         提出先:       item.提出先       ?? '',
@@ -461,18 +462,17 @@ function groupsToFlat(groups) {
 function isRowComplete(g, it) {
   const itemOk   = !!(it['区分'] && it['サービス種別'] && it['提出先'] && it['提出先URL']);
   const sharedOk = !!(g['打ち合わせ日'] && g['納品日'] && g['提出担当']);
-  const teihiOk  = g['提出担当'] !== '齊藤事務所で提出' || !!g['提出日'];
-  return itemOk && sharedOk && teihiOk;
+  return itemOk && sharedOk;
 }
 
 /* ── グループ編集モーダル ── */
 function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, onClose }) {
-  const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
-  const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 提出先:'', サービス種別:'', 提出先URL:'' });
+  const dateLabel = '納品日';
+  const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 提出先:'', サービス種別:'', 提出先URL:'', deadlineDate:'' });
 
   const initGroup = initial || {
     グループid: null, 顧問先名:'', 顧問先ナンバー:'', 年度:'', 打ち合わせ日:'', 納品日:'',
-    提出担当:'自社で提出', 提出日:'', deadlineDate:'', submittedDate:'', items:[emptyItem()],
+    提出担当:'自社で提出', 提出日:'', submittedDate:'', items:[emptyItem()],
   };
 
   const [shared, setShared] = useState({
@@ -483,7 +483,6 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
     納品日:        initGroup.納品日,
     提出担当:      initGroup.提出担当,
     提出日:        initGroup.提出日,
-    deadlineDate:  initGroup.deadlineDate  ?? '',
     submittedDate: initGroup.submittedDate ?? '',
   });
   const [items, setItems] = useState(initGroup.items.length > 0 ? initGroup.items : [emptyItem()]);
@@ -550,19 +549,18 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
               {TEISHUTSU_OPTIONS.map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
-          {shared['提出担当'] === '齊藤事務所で提出' && (
-            <div>
-              <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>担当提出日</label>
-              <input type="date" value={shared['提出日']} onChange={e => setS('提出日', e.target.value)} />
-            </div>
-          )}
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出期日</label>
-            <input type="date" value={shared['deadlineDate']} onChange={e => setS('deadlineDate', e.target.value)} />
-          </div>
           <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
-            <input type="date" value={shared['submittedDate']} onChange={e => setS('submittedDate', e.target.value)} />
+            <label style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', cursor:'pointer', fontWeight:'500'}}>
+              <input type="checkbox"
+                checked={shared['submittedDate'] === '自社で提出'}
+                onChange={e => setS('submittedDate', e.target.checked ? '自社で提出' : '')}
+                style={{width:'auto'}} />
+              自社で提出
+            </label>
+            {shared['submittedDate'] !== '自社で提出' && (
+              <input type="date" value={shared['submittedDate']} onChange={e => setS('submittedDate', e.target.value)} />
+            )}
           </div>
         </div>
 
@@ -573,17 +571,18 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
           <button className="btn btn-secondary" style={{padding:'3px 12px', fontSize:'14px'}} onClick={addItem}>＋ 行を追加</button>
         </div>
         <div style={{overflowX:'auto', marginBottom:'20px', border:'1px solid #e5e7eb', borderRadius:'6px'}}>
-          <table style={{width:'100%', borderCollapse:'collapse', minWidth:'700px', tableLayout:'fixed'}}>
+          <table style={{width:'100%', borderCollapse:'collapse', minWidth:'800px', tableLayout:'fixed'}}>
             <colgroup>
+              <col style={{width:'12%'}} />
               <col style={{width:'15%'}} />
-              <col style={{width:'17%'}} />
-              <col style={{width:'30%'}} />
-              <col style={{width:'34%'}} />
+              <col style={{width:'24%'}} />
+              <col style={{width:'27%'}} />
+              <col style={{width:'18%'}} />
               <col style={{width:'4%'}} />
             </colgroup>
             <thead>
               <tr>
-                {['区分','提出先（保険者）','サービス種別','提出先URL',''].map(h => (
+                {['区分','提出先（保険者）','サービス種別','提出先URL','提出期日',''].map(h => (
                   <th key={h} style={thStyle}>{h}</th>
                 ))}
               </tr>
@@ -604,6 +603,9 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
                   </td>
                   <td style={tdStyle}>
                     <input value={it['提出先URL']} onChange={e => setItem(idx,'提出先URL',e.target.value)} placeholder="https://..." style={{width:'100%'}} />
+                  </td>
+                  <td style={tdStyle}>
+                    <input type="date" value={it['deadlineDate'] || ''} onChange={e => setItem(idx,'deadlineDate',e.target.value)} style={{width:'100%'}} />
                   </td>
                   <td style={{...tdStyle, textAlign:'center'}}>
                     {items.length > 1 && (
@@ -636,7 +638,7 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
   const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
   const [showCancelled, setShowCancelled] = useState(false);
 
-  const dateLabel = docType === '計画書' ? '計画書納品日' : '実績報告書納品日';
+  const dateLabel = '納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
 
   const displayed = useMemo(() => {
@@ -721,14 +723,14 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
         <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
           <thead>
             <tr>
-              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','打ち合わせ日',dateLabel,'提出担当','担当提出日','提出期日','提出日','操作'].map(h => (
+              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','打ち合わせ日',dateLabel,'提出担当','提出日','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={14} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={13} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
@@ -768,16 +770,15 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
                     <td style={cell(rBg)}>
                       {it['提出先URL'] ? <a href={it['提出先URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
                     </td>
+                    <td style={cell(rBg)}>{fmtDate(it['deadlineDate'])}</td>
                     {/* 進捗セル（結合） */}
                     {idx === 0 && <>
                       <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['打ち合わせ日'])}</td>
                       <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['納品日'])}</td>
                       <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px'}}>{g['提出担当']}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
-                        {g['提出担当'] === '齊藤事務所で提出' ? fmtDate(g['提出日']) : ''}
+                        {g['submittedDate'] === '自社で提出' ? '自社で提出' : fmtDate(g['submittedDate'])}
                       </td>
-                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['deadlineDate'])}</td>
-                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['submittedDate'])}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
                           <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
