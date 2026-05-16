@@ -409,7 +409,12 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
    届出管理 モーダル
 ══════════════════════════════════════════ */
 const KUBUN_OPTIONS = ['介護保険', '障害'];
-const TEISHUTSU_OPTIONS = ['自社で提出', '齊藤事務所で提出'];
+const TEISHUTSU_OPTIONS = ['自社', '齊藤事務所'];
+function normalizeTeishutsu(v) {
+  if (!v || v === '自社で提出') return '自社';
+  if (v === '齊藤事務所で提出') return '齊藤事務所';
+  return v;
+}
 
 /* ── フラット行 ↔ グループ変換 ── */
 function flatToGroups(rows) {
@@ -426,7 +431,7 @@ function flatToGroups(rows) {
         顧問先ナンバー: r['顧問先ナンバー'] ?? '',
         打ち合わせ日:  r['打ち合わせ日'] ?? '',
         納品日:        r['納品日']       ?? '',
-        提出担当:      r['提出担当'] || r['提出方法'] || '自社で提出',
+        提出担当:      normalizeTeishutsu(r['提出担当'] || r['提出方法']),
         提出日:        r['提出日']       ?? '',
         deadlineDate:  r['deadlineDate']  ?? '',
         submittedDate: r['submittedDate'] ?? '',
@@ -490,7 +495,7 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
 
   const initGroup = initial || {
     グループid: null, 顧問先名:'', 顧問先ナンバー:'', 年度: defaultNendo || '', 打ち合わせ日:'', 納品日:'',
-    提出担当:'自社で提出', 提出日:'', submittedDate:'', items:[emptyItem()],
+    提出担当:'自社', 提出日:'', submittedDate:'', items:[emptyItem()],
   };
 
   const [shared, setShared] = useState({
