@@ -758,7 +758,7 @@ function CopySelectModal({ title, confirmMsg, srcGroups, onExecute, onClose }) {
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows }) {
+function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows, rinjiShoguPlanRows, rinjiBaseupPlanRows }) {
   const [modal, setModal] = useState(null);
   const [copyModal, setCopyModal] = useState(null); // null | {title, confirmMsg, srcGroups, dstNendo}
   const [filterDone, setFilterDone] = useState(false);
@@ -880,6 +880,24 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     setCopyModal(null);
   }
 
+  function handleCopyFromOtherPlan(srcRows, srcLabel) {
+    if (!filterNendo) return;
+    const nendo = filterNendo;
+    const srcGroups = flatToGroups((srcRows || []).filter(r => String(r['年度']) === nendo && r['取消'] !== '1'));
+    if (srcGroups.length === 0) { alert(`${nendo}年度の${srcLabel}計画書が見つかりません`); return; }
+    const alreadyRegistered = new Set(
+      rows.filter(r => String(r['年度']) === nendo && r['取消'] !== '1').map(r => r['顧問先名'])
+    );
+    const filtered = srcGroups.filter(g => !alreadyRegistered.has(g['顧問先名']));
+    if (filtered.length === 0) { alert('すでに全ての顧問先が登録済みです'); return; }
+    setCopyModal({
+      title: `${srcLabel}からコピー（${nendo}年度）`,
+      confirmMsg: `${nendo}年度の${srcLabel}計画書を臨時の補助金にコピーします。よろしいですか？`,
+      srcGroups: filtered,
+      dstNendo: nendo,
+    });
+  }
+
   const thS = {padding:'10px 12px', textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
   const cell = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...(bg ? {background:bg} : {})});
   const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
@@ -896,7 +914,26 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <button onClick={() => setSelNendo(n => n + 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
-        {!isRinji && (docType === '計画書' ? (
+        {isRinji ? (
+          <>
+            <button
+              className="btn btn-secondary"
+              style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
+              disabled={!filterNendo}
+              title={filterNendo ? `${filterNendo}年度の処遇改善加算計画書からコピー` : '先に年度で絞り込んでください'}
+              onClick={() => handleCopyFromOtherPlan(rinjiShoguPlanRows, '処遇改善加算')}>
+              処遇改善加算からコピー
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
+              disabled={!filterNendo}
+              title={filterNendo ? `${filterNendo}年度のベースアップ計画書からコピー` : '先に年度で絞り込んでください'}
+              onClick={() => handleCopyFromOtherPlan(rinjiBaseupPlanRows, 'ベースアップ')}>
+              ベースアップからコピー
+            </button>
+          </>
+        ) : (docType === '計画書' ? (
           <button
             className="btn btn-secondary"
             style={{padding:'6px 18px'}}
@@ -1368,6 +1405,8 @@ function App() {
             onGroupDateChange={handleDeliveryGroupDateChange}
             onItemFieldChange={handleDeliveryItemFieldChange}
             planRows={mainTab === '処遇改善加算' ? shoguPlan : mainTab === 'ベースアップ評価料' ? baseupPlan : rinjiPlan}
+            rinjiShoguPlanRows={mainTab === '臨時の補助金' ? shoguPlan : undefined}
+            rinjiBaseupPlanRows={mainTab === '臨時の補助金' ? baseupPlan : undefined}
           />
         )}
       </div>
