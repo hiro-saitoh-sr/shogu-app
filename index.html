@@ -500,8 +500,6 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
     打ち合わせ日:  initGroup.打ち合わせ日,
     納品日:        initGroup.納品日,
     提出担当:      initGroup.提出担当,
-    提出日:        initGroup.提出日,
-    submittedDate: initGroup.submittedDate ?? '',
   });
   const [items, setItems] = useState(initGroup.items.length > 0 ? initGroup.items : [emptyItem()]);
 
@@ -550,7 +548,7 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>年度</label>
             <select value={shared['年度']} onChange={e => setS('年度', e.target.value)}>
               <option value="">-- 選択 --</option>
-              {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}年度</option>)}
+              {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
             </select>
           </div>
           <div>
@@ -676,54 +674,20 @@ function InlineDateCell({ value, displayText, onChange }) {
   );
 }
 
-/* ── 提出日セル（自社で提出 ↔ 日付入力 切替対応） ── */
-function InlineSubmitCell({ selfSubmit, submittedDate, onChange }) {
-  const [editing, setEditing] = useState(false);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    if (editing && !selfSubmit && inputRef.current) {
-      inputRef.current.focus();
-      try { inputRef.current.showPicker(); } catch(e) {}
-    }
-  }, [editing]);
-
-  const displayLabel = selfSubmit ? '自社で提出' : (submittedDate ? fmtDate(submittedDate) : '－');
-  const hasValue = selfSubmit || !!submittedDate;
-
-  if (!editing) {
-    return (
-      <span onClick={() => setEditing(true)} title="クリックして設定"
-        style={{cursor:'pointer', display:'inline-block', minWidth:'72px', padding:'2px 6px',
-          color: hasValue ? '#111827' : '#9ca3af', borderBottom:'1px dashed #9ca3af', whiteSpace:'nowrap'}}>
-        {displayLabel}
-      </span>
-    );
+/* ── URLコピーボタン ── */
+function CopyButton({ url }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(url).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
   }
-
-  if (selfSubmit) {
-    return (
-      <div style={{display:'inline-flex', flexDirection:'column', gap:'3px'}}>
-        <span style={{fontSize:'13px', fontWeight:'600', padding:'2px 4px', color:'#111827', whiteSpace:'nowrap'}}>自社で提出 ✓</span>
-        <button onMouseDown={e => { e.preventDefault(); onChange({ selfSubmit: false }); setEditing(false); }}
-          style={{fontSize:'13px', padding:'2px 6px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'4px', background:'#f3f4f6', fontFamily:'inherit', whiteSpace:'nowrap'}}>
-          日付に変更
-        </button>
-      </div>
-    );
-  }
-
   return (
-    <div style={{display:'inline-flex', flexDirection:'column', gap:'3px'}}>
-      <input ref={inputRef} type="date" defaultValue={submittedDate || ''}
-        onChange={e => { onChange({ submittedDate: e.target.value, selfSubmit: false }); setEditing(false); }}
-        onBlur={() => setEditing(false)}
-        style={{width:'130px', fontSize:'14px', padding:'4px 6px', border:'1px solid #d1d5db', borderRadius:'4px', fontFamily:'inherit'}} />
-      <button onMouseDown={e => { e.preventDefault(); onChange({ selfSubmit: true, submittedDate: '' }); setEditing(false); }}
-        style={{fontSize:'13px', padding:'2px 6px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'4px', background:'#fef3c7', fontFamily:'inherit', fontWeight:'600', whiteSpace:'nowrap'}}>
-        自社で提出
-      </button>
-    </div>
+    <button onClick={handleCopy}
+      style={{fontSize:'11px', padding:'1px 5px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'3px', background:'#f9fafb', fontFamily:'inherit', color:'#374151', lineHeight:'1.4', whiteSpace:'nowrap', flexShrink:0}}>
+      {copied ? '✓' : 'コピー'}
+    </button>
   );
 }
 
@@ -790,7 +754,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     setModal(null);
   }
 
-  const thS = {padding:'10px 12px', textAlign:'left', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
+  const thS = {padding:'10px 12px', textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
   const cell = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...(bg ? {background:bg} : {})});
   const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'top', paddingTop:'12px', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
 
@@ -802,7 +766,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <div style={{display:'flex', alignItems:'center', background:'white', border:'1px solid #e5e7eb', borderRadius:'8px', overflow:'hidden'}}>
           <button onClick={() => setSelNendo(n => n - 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderRight:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>←</button>
-          <span style={{padding:'4px 18px', fontWeight:'800', color:'#15803d', fontSize:'17px', whiteSpace:'nowrap'}}>{selNendo}年度</span>
+          <span style={{padding:'4px 18px', fontWeight:'800', color:'#15803d', fontSize:'17px', whiteSpace:'nowrap'}}>{selNendo}</span>
           <button onClick={() => setSelNendo(n => n + 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
@@ -819,7 +783,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <select value={filterNendo} onChange={e => setFilterNendo(e.target.value)}
           style={{width:'150px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">年度（すべて）</option>
-          {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}年度</option>)}
+          {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
         </select>
         <select value={filterNohon} onChange={e => setFilterNohon(e.target.value)}
           style={{width:'210px', padding:'6px 10px', fontSize:'16px'}}>
@@ -841,14 +805,14 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
           <thead>
             <tr>
-              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','納品日','提出日','打ち合わせ日','提出担当','操作'].map(h => (
+              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','打合せ','納品日','提出担当','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={13} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={12} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
@@ -874,10 +838,10 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     )}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), fontSize:'15px', fontWeight:'700', color:'#15803d'}}>
-                        {g['年度'] ? `${g['年度']}年度` : ''}
+                        {g['年度'] || ''}
                       </td>
                     )}
-                    {/* 提出先ごとのセル */}
+                    {/* 提出先ごとのセル（区分〜提出期日） */}
                     <td style={cell(rBg)}>
                       <span style={{background: it['区分']==='介護保険' ? '#dbeafe' : '#fce7f3', color: it['区分']==='介護保険' ? '#1e3a8a' : '#9d174d', padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
                         {it['区分']}
@@ -886,27 +850,27 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     <td style={cell(rBg)}>{it['サービス種別']}</td>
                     <td style={cell(rBg)}>{it['提出先']}</td>
                     <td style={cell(rBg)}>
-                      {it['提出先URL'] ? <a href={it['提出先URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
+                      {it['提出先URL'] ? (
+                        <span style={{display:'inline-flex', alignItems:'center', gap:'4px'}}>
+                          <a href={it['提出先URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a>
+                          <CopyButton url={it['提出先URL']} />
+                        </span>
+                      ) : ''}
                     </td>
                     <td style={cell(rBg)}>{fmtDate(it['deadlineDate'])}</td>
-                    {/* 提出先行ごとの納品日 */}
+                    {/* 打合せ（グループ結合） */}
+                    {idx === 0 && (
+                      <td rowSpan={rs} style={merged(gBg)}>
+                        <InlineDateCell value={g['打ち合わせ日']} onChange={v => onGroupDateChange(g.グループid, '打ち合わせ日', v)} />
+                      </td>
+                    )}
+                    {/* 納品日（行ごと） */}
                     <td style={cell(rBg)}>
                       <InlineDateCell value={it.deliveryDate}
                         onChange={v => onItemFieldChange(g.グループid, it.保険者id, { deliveryDate: v })} />
                     </td>
-                    {/* 提出先行ごとの提出日 */}
-                    <td style={cell(rBg)}>
-                      <InlineSubmitCell
-                        selfSubmit={!!it.selfSubmit}
-                        submittedDate={it.submittedDate || ''}
-                        onChange={fields => onItemFieldChange(g.グループid, it.保険者id, fields)}
-                      />
-                    </td>
-                    {/* 打ち合わせ日・提出担当（結合） */}
+                    {/* 提出担当・操作（グループ結合） */}
                     {idx === 0 && <>
-                      <td rowSpan={rs} style={merged(gBg)}>
-                        <InlineDateCell value={g['打ち合わせ日']} onChange={v => onGroupDateChange(g.グループid, '打ち合わせ日', v)} />
-                      </td>
                       <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px'}}>{g['提出担当']}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
