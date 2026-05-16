@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -135,7 +135,7 @@ function snapToArray(snap) {
 
 const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間','契約解除'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
-const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','顧問先ナンバー','年度','打ち合わせ日','納品日','提出担当','提出日','区分','提出先','サービス種別','提出先URL','取消','deadlineDate','submittedDate'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','顧問先ナンバー','年度','打ち合わせ日','提出担当','区分','提出先','サービス種別','提出先URL','取消','deadlineDate','deliveryDate','selfSubmit','submittedDate'];
 const NENDO_OPTIONS   = [2025, 2026, 2027];
 
 /* ══════════════════════════════════════════
@@ -440,7 +440,10 @@ function flatToGroups(rows) {
       提出先:       r['提出先'] || r['保険者'] || '',
       サービス種別: r['サービス種別']  ?? '',
       提出先URL:    r['提出先URL'] || r['指定権者URL'] || '',
-      deadlineDate: r['deadlineDate']  ?? '',
+      deadlineDate:  r['deadlineDate']  ?? '',
+      deliveryDate:  r['deliveryDate']  ?? '',
+      selfSubmit:    r['selfSubmit']    ?? false,
+      submittedDate: r['submittedDate'] ?? '',
     });
   });
   return order.map(gid => map.get(gid));
@@ -458,15 +461,15 @@ function groupsToFlat(groups) {
         年度:          g.年度          ?? '',
         取消:          g.取消          ?? '',
         打ち合わせ日:  g.打ち合わせ日  ?? '',
-        納品日:        g.納品日        ?? '',
         提出担当:      g.提出担当      ?? '',
-        提出日:        g.提出日        ?? '',
-        deadlineDate:  item.deadlineDate ?? '',
-        submittedDate: g.submittedDate ?? '',
         区分:         item.区分         ?? '',
         提出先:       item.提出先       ?? '',
         サービス種別: item.サービス種別 ?? '',
         提出先URL:    item.提出先URL    ?? '',
+        deadlineDate:  item.deadlineDate  ?? '',
+        deliveryDate:  item.deliveryDate  ?? '',
+        selfSubmit:    item.selfSubmit    ?? false,
+        submittedDate: item.submittedDate ?? '',
       });
     });
   });
@@ -476,7 +479,7 @@ function groupsToFlat(groups) {
 /* 行完了判定 */
 function isRowComplete(g, it) {
   const itemOk   = !!(it['区分'] && it['サービス種別'] && it['提出先'] && it['提出先URL']);
-  const sharedOk = !!(g['打ち合わせ日'] && g['納品日'] && g['提出担当']);
+  const sharedOk = !!(g['打ち合わせ日'] && it.deliveryDate && g['提出担当']);
   return itemOk && sharedOk;
 }
 
@@ -673,10 +676,61 @@ function InlineDateCell({ value, displayText, onChange }) {
   );
 }
 
+/* ── 提出日セル（自社で提出 ↔ 日付入力 切替対応） ── */
+function InlineSubmitCell({ selfSubmit, submittedDate, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editing && !selfSubmit && inputRef.current) {
+      inputRef.current.focus();
+      try { inputRef.current.showPicker(); } catch(e) {}
+    }
+  }, [editing]);
+
+  const displayLabel = selfSubmit ? '自社で提出' : (submittedDate ? fmtDate(submittedDate) : '－');
+  const hasValue = selfSubmit || !!submittedDate;
+
+  if (!editing) {
+    return (
+      <span onClick={() => setEditing(true)} title="クリックして設定"
+        style={{cursor:'pointer', display:'inline-block', minWidth:'72px', padding:'2px 6px',
+          color: hasValue ? '#111827' : '#9ca3af', borderBottom:'1px dashed #9ca3af', whiteSpace:'nowrap'}}>
+        {displayLabel}
+      </span>
+    );
+  }
+
+  if (selfSubmit) {
+    return (
+      <div style={{display:'inline-flex', flexDirection:'column', gap:'3px'}}>
+        <span style={{fontSize:'13px', fontWeight:'600', padding:'2px 4px', color:'#111827', whiteSpace:'nowrap'}}>自社で提出 ✓</span>
+        <button onMouseDown={e => { e.preventDefault(); onChange({ selfSubmit: false }); setEditing(false); }}
+          style={{fontSize:'13px', padding:'2px 6px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'4px', background:'#f3f4f6', fontFamily:'inherit', whiteSpace:'nowrap'}}>
+          日付に変更
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{display:'inline-flex', flexDirection:'column', gap:'3px'}}>
+      <input ref={inputRef} type="date" defaultValue={submittedDate || ''}
+        onChange={e => { onChange({ submittedDate: e.target.value, selfSubmit: false }); setEditing(false); }}
+        onBlur={() => setEditing(false)}
+        style={{width:'130px', fontSize:'14px', padding:'4px 6px', border:'1px solid #d1d5db', borderRadius:'4px', fontFamily:'inherit'}} />
+      <button onMouseDown={e => { e.preventDefault(); onChange({ selfSubmit: true, submittedDate: '' }); setEditing(false); }}
+        style={{fontSize:'13px', padding:'2px 6px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'4px', background:'#fef3c7', fontFamily:'inherit', fontWeight:'600', whiteSpace:'nowrap'}}>
+        自社で提出
+      </button>
+    </div>
+  );
+}
+
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange }) {
+function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange }) {
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
@@ -719,8 +773,8 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     if (filterNendo) result = result.filter(g => g['年度'] === filterNendo);
     if (filterDone)  result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
     if (filterName)  result = result.filter(g => g.顧問先名 === filterName);
-    if (filterNohon === '入力済み') result = result.filter(g => !!g['納品日']);
-    if (filterNohon === '未入力')   result = result.filter(g => !g['納品日']);
+    if (filterNohon === '入力済み') result = result.filter(g => g.items.every(it => !!it.deliveryDate));
+    if (filterNohon === '未入力')   result = result.filter(g => g.items.some(it => !it.deliveryDate));
     result = [...result].sort((a, b) => {
       const na = (a['顧問先ナンバー'] !== '' && a['顧問先ナンバー'] != null) ? Number(a['顧問先ナンバー']) : Infinity;
       const nb = (b['顧問先ナンバー'] !== '' && b['顧問先ナンバー'] != null) ? Number(b['顧問先ナンバー']) : Infinity;
@@ -787,7 +841,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
           <thead>
             <tr>
-              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','打ち合わせ日',dateLabel,'提出担当','提出日','操作'].map(h => (
+              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','納品日','提出日','打ち合わせ日','提出担当','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
@@ -799,10 +853,11 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
             {displayed.map(g => {
               const rs = g.items.length;
               const cancelled = g['取消'] === '1';
-              const hasNohon  = !!g['納品日'];
-              const gBg = cancelled ? '#e5e7eb' : (hasNohon ? '#fefce8' : undefined);
+              const allItemsHaveDelivery = g.items.every(it => !!it.deliveryDate);
+              const gBg = cancelled ? '#e5e7eb' : (allItemsHaveDelivery ? '#fefce8' : undefined);
               return g.items.map((it, idx) => {
-                const rBg = cancelled ? '#e5e7eb' : (hasNohon ? '#fefce8' : undefined);
+                const itemHasDelivery = !!it.deliveryDate;
+                const rBg = cancelled ? '#e5e7eb' : (itemHasDelivery ? '#fefce8' : undefined);
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
@@ -834,22 +889,25 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                       {it['提出先URL'] ? <a href={it['提出先URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a> : ''}
                     </td>
                     <td style={cell(rBg)}>{fmtDate(it['deadlineDate'])}</td>
-                    {/* 進捗セル（結合） */}
+                    {/* 提出先行ごとの納品日 */}
+                    <td style={cell(rBg)}>
+                      <InlineDateCell value={it.deliveryDate}
+                        onChange={v => onItemFieldChange(g.グループid, it.保険者id, { deliveryDate: v })} />
+                    </td>
+                    {/* 提出先行ごとの提出日 */}
+                    <td style={cell(rBg)}>
+                      <InlineSubmitCell
+                        selfSubmit={!!it.selfSubmit}
+                        submittedDate={it.submittedDate || ''}
+                        onChange={fields => onItemFieldChange(g.グループid, it.保険者id, fields)}
+                      />
+                    </td>
+                    {/* 打ち合わせ日・提出担当（結合） */}
                     {idx === 0 && <>
                       <td rowSpan={rs} style={merged(gBg)}>
                         <InlineDateCell value={g['打ち合わせ日']} onChange={v => onGroupDateChange(g.グループid, '打ち合わせ日', v)} />
                       </td>
-                      <td rowSpan={rs} style={merged(gBg)}>
-                        <InlineDateCell value={g['納品日']} onChange={v => onGroupDateChange(g.グループid, '納品日', v)} />
-                      </td>
                       <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px'}}>{g['提出担当']}</td>
-                      <td rowSpan={rs} style={merged(gBg)}>
-                        <InlineDateCell
-                          value={g['submittedDate'] === '自社で提出' ? '' : (g['submittedDate'] || '')}
-                          displayText={g['submittedDate'] === '自社で提出' ? '自社で提出' : null}
-                          onChange={v => onGroupDateChange(g.グループid, 'submittedDate', v)}
-                        />
-                      </td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
                           <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
@@ -1059,6 +1117,15 @@ function App() {
     const updated = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, [field]: value} : r);
     db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(updated).catch(e => alert('保存エラー: ' + e.message));
   }
+  function handleDeliveryItemFieldChange(gid, hokenshaId, fieldsObj) {
+    const updated = currentRows.map(r => {
+      if (Number(r['グループid'] ?? r['id'] ?? 0) === gid && Number(r['保険者id'] ?? 0) === hokenshaId) {
+        return {...r, ...fieldsObj};
+      }
+      return r;
+    });
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(updated).catch(e => alert('保存エラー: ' + e.message));
+  }
 
   /* ── ログイン前 ── */
   if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
@@ -1183,6 +1250,7 @@ function App() {
             onDelete={handleDeliveryDelete}
             onRestore={handleDeliveryRestore}
             onGroupDateChange={handleDeliveryGroupDateChange}
+            onItemFieldChange={handleDeliveryItemFieldChange}
           />
         )}
       </div>
@@ -1195,3 +1263,4 @@ root.render(<App />);
 </script>
 </body>
 </html>
+
