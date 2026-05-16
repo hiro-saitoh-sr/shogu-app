@@ -481,9 +481,9 @@ function isRowComplete(g, it) {
 }
 
 /* ── グループ編集モーダル ── */
-function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, onClose }) {
+function DeliveryModal({ initial, allRows, masters, isRinji, isBaseup, docType, onSave, onClose }) {
   const dateLabel = '納品日';
-  const emptyItem = () => ({ 保険者id: Date.now(), 区分:'介護保険', 提出先:'', サービス種別:'', 提出先URL:'', deadlineDate:'' });
+  const emptyItem = () => ({ 保険者id: Date.now(), 区分: isBaseup ? '医療' : '介護保険', 提出先:'', サービス種別:'', 提出先URL:'', deadlineDate:'' });
 
   const initGroup = initial || {
     グループid: null, 顧問先名:'', 顧問先ナンバー:'', 年度:'', 打ち合わせ日:'', 納品日:'',
@@ -511,7 +511,7 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
     if (!shared['顧問先名']) return;
     const allGids = allRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0)).filter(n => !isNaN(n));
     const gid = initial ? initial.グループid : (allGids.length > 0 ? Math.max(...allGids) + 1 : 1);
-    const numberedItems = items.map((it, i) => ({...it, 保険者id: it.保険者id || i + 1}));
+    const numberedItems = items.map((it, i) => ({...it, 保険者id: it.保険者id || i + 1, ...(isBaseup ? {区分:'医療'} : {})}));
     onSave({ ...shared, グループid: gid, items: numberedItems });
   }
 
@@ -606,9 +606,13 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
               {items.map((it, idx) => (
                 <tr key={it.保険者id} style={{borderBottom:'1px solid #f3f4f6'}}>
                   <td style={tdStyle}>
-                    <select value={it['区分']} onChange={e => setItem(idx,'区分',e.target.value)} style={{width:'100%'}}>
-                      {KUBUN_OPTIONS.map(o => <option key={o}>{o}</option>)}
-                    </select>
+                    {isBaseup ? (
+                      <span style={{fontWeight:'700', fontSize:'15px', padding:'4px 8px', display:'inline-block'}}>医療</span>
+                    ) : (
+                      <select value={it['区分']} onChange={e => setItem(idx,'区分',e.target.value)} style={{width:'100%'}}>
+                        {KUBUN_OPTIONS.map(o => <option key={o}>{o}</option>)}
+                      </select>
+                    )}
                   </td>
                   <td style={tdStyle}>
                     <input value={it['提出先']} onChange={e => setItem(idx,'提出先',e.target.value)} placeholder="例：東京都" style={{width:'100%'}} />
@@ -645,7 +649,7 @@ function DeliveryModal({ initial, allRows, masters, isRinji, docType, onSave, on
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, onSave, onDelete, onRestore }) {
+function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore }) {
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
@@ -821,6 +825,7 @@ function DeliveryView({ rows, masters, isRinji, docType, selNendo, setSelNendo, 
           allRows={rows}
           masters={masters}
           isRinji={isRinji}
+          isBaseup={isBaseup}
           docType={docType}
           onSave={handleGroupSave}
           onClose={() => setModal(null)}
@@ -1101,6 +1106,7 @@ function App() {
             rows={currentRows}
             masters={deliveryMasters}
             isRinji={mainTab === '臨時の補助金'}
+            isBaseup={mainTab === 'ベースアップ評価料'}
             docType={subTab}
             selNendo={selNendo}
             setSelNendo={setSelNendo}
