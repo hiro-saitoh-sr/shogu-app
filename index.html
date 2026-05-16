@@ -884,10 +884,13 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     const nendo = String(selNendo);
     const srcGroups = flatToGroups((srcRows || []).filter(r => String(r['年度']) === nendo && r['取消'] !== '1'));
     if (srcGroups.length === 0) { alert(`${nendo}年度の${srcLabel}計画書が見つかりません`); return; }
-    const alreadyRegistered = new Set(
-      rows.filter(r => String(r['年度']) === nendo && r['取消'] !== '1').map(r => r['顧問先名'])
+    const alreadyRegisteredKeys = new Set(
+      rows.filter(r => String(r['年度']) === nendo && r['取消'] !== '1')
+          .map(r => `${r['顧問先名']}::${r['区分']}`)
     );
-    const filtered = srcGroups.filter(g => !alreadyRegistered.has(g['顧問先名']));
+    const filtered = srcGroups.filter(g =>
+      !g.items.every(it => alreadyRegisteredKeys.has(`${g['顧問先名']}::${it['区分']}`))
+    );
     if (filtered.length === 0) { alert('すでに全ての顧問先が登録済みです'); return; }
     setCopyModal({
       title: `${srcLabel}からコピー（${nendo}年度）`,
