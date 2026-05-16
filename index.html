@@ -699,10 +699,68 @@ function CopyButton({ url }) {
 }
 
 /* ══════════════════════════════════════════
+   コピー対象選択モーダル
+══════════════════════════════════════════ */
+function CopySelectModal({ title, confirmMsg, srcGroups, onExecute, onClose }) {
+  const sorted = [...srcGroups].sort((a, b) => {
+    const na = a['顧問先ナンバー'] !== '' && a['顧問先ナンバー'] != null ? Number(a['顧問先ナンバー']) : Infinity;
+    const nb = b['顧問先ナンバー'] !== '' && b['顧問先ナンバー'] != null ? Number(b['顧問先ナンバー']) : Infinity;
+    return na - nb;
+  });
+
+  const [selected, setSelected] = useState(() => new Set(sorted.map(g => g.グループid)));
+
+  function toggle(gid) {
+    setSelected(s => { const ns = new Set(s); ns.has(gid) ? ns.delete(gid) : ns.add(gid); return ns; });
+  }
+
+  function handleExecute() {
+    if (selected.size === 0) { alert('顧問先を選択してください'); return; }
+    if (!confirm(confirmMsg)) return;
+    onExecute(sorted.filter(g => selected.has(g.グループid)));
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{width:'520px'}} onClick={e => e.stopPropagation()}>
+        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'16px', color:'#111827'}}>{title}</h2>
+        <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
+          <button className="btn btn-secondary" style={{padding:'4px 14px', fontSize:'15px'}}
+            onClick={() => setSelected(new Set(sorted.map(g => g.グループid)))}>全て選択</button>
+          <button className="btn btn-secondary" style={{padding:'4px 14px', fontSize:'15px'}}
+            onClick={() => setSelected(new Set())}>全て解除</button>
+          <span style={{marginLeft:'auto', fontSize:'15px', color:'#6b7280', alignSelf:'center'}}>
+            {selected.size} / {sorted.length} 件選択中
+          </span>
+        </div>
+        <div style={{maxHeight:'400px', overflowY:'auto', border:'1px solid #e5e7eb', borderRadius:'6px', padding:'4px 0'}}>
+          {sorted.map(g => (
+            <label key={g.グループid}
+              style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 14px', cursor:'pointer', borderBottom:'1px solid #f3f4f6'}}>
+              <input type="checkbox" checked={selected.has(g.グループid)} onChange={() => toggle(g.グループid)}
+                style={{width:'18px', height:'18px', flexShrink:0}} />
+              <span style={{fontSize:'17px'}}>
+                {g['顧問先ナンバー'] ? <span style={{color:'#6b7280', marginRight:'6px', fontSize:'15px'}}>[{g['顧問先ナンバー']}]</span> : null}
+                {g['顧問先名']}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div style={{display:'flex', gap:'12px', justifyContent:'flex-end', marginTop:'20px'}}>
+          <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
+          <button className="btn btn-primary" onClick={handleExecute}>コピー実行</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
 function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows }) {
   const [modal, setModal] = useState(null);
+  const [copyModal, setCopyModal] = useState(null); // null | {title, confirmMsg, srcGroups, dstNendo}
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
   const [filterNendo, setFilterNendo] = useState('');
@@ -786,18 +844,30 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     const srcNendo = String(selNendo - 1);
     const srcGroups = flatToGroups(rows.filter(r => String(r['年度']) === srcNendo && r['取消'] !== '1'));
     if (srcGroups.length === 0) { alert(`${srcNendo}年度の計画書が見つかりません`); return; }
-    if (!confirm(`${srcNendo}年度の計画書を${dstNendo}年度にコピーします。よろしいですか？`)) return;
-    const newGroups = makeCopiedGroups(srcGroups, dstNendo, rows);
-    onSave(groupsToFlat([...flatToGroups(rows), ...newGroups]));
+    setCopyModal({
+      title: `前年度からコピー（${srcNendo}→${dstNendo}年度）`,
+      confirmMsg: `${srcNendo}年度の計画書を${dstNendo}年度にコピーします。よろしいですか？`,
+      srcGroups,
+      dstNendo,
+    });
   }
 
   function handleCopyFromPlan() {
     const nendo = String(selNendo);
     const srcGroups = flatToGroups((planRows || []).filter(r => String(r['年度']) === nendo && r['取消'] !== '1'));
     if (srcGroups.length === 0) { alert(`${nendo}年度の計画書が見つかりません`); return; }
-    if (!confirm(`${nendo}年度の計画書を${docType}にコピーします。よろしいですか？`)) return;
-    const newGroups = makeCopiedGroups(srcGroups, nendo, rows);
+    setCopyModal({
+      title: `計画書からコピー（${nendo}年度 → ${docType}）`,
+      confirmMsg: `${nendo}年度の計画書を${docType}にコピーします。よろしいですか？`,
+      srcGroups,
+      dstNendo: nendo,
+    });
+  }
+
+  function executeCopy(selectedGroups) {
+    const newGroups = makeCopiedGroups(selectedGroups, copyModal.dstNendo, rows);
     onSave(groupsToFlat([...flatToGroups(rows), ...newGroups]));
+    setCopyModal(null);
   }
 
   const thS = {padding:'10px 12px', textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
@@ -967,6 +1037,15 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           docType={docType}
           onSave={handleGroupSave}
           onClose={() => setModal(null)}
+        />
+      )}
+      {copyModal && (
+        <CopySelectModal
+          title={copyModal.title}
+          confirmMsg={copyModal.confirmMsg}
+          srcGroups={copyModal.srcGroups}
+          onExecute={executeCopy}
+          onClose={() => setCopyModal(null)}
         />
       )}
     </div>
