@@ -1020,10 +1020,18 @@ function App() {
     return subTab === '計画書' ? rinjiPlan : rinjiReport;
   }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport, baseupPlan, baseupInterim, baseupReport]);
 
-  /* ベースアップ評価料では業種「医療」の顧問先のみに絞り込む */
+  /* タブごとに顧問先を業種でフィルタリング */
   const deliveryMasters = useMemo(() => {
-    if (mainTab === 'ベースアップ評価料') return masters.filter(m => parseGyoshu(m['業種']).includes('医療'));
-    return masters;
+    if (mainTab === 'ベースアップ評価料') {
+      return masters.filter(m => parseGyoshu(m['業種']).includes('医療'));
+    }
+    if (mainTab === '処遇改善加算') {
+      return masters.filter(m => {
+        const g = parseGyoshu(m['業種']);
+        return g.includes('介護保険') || g.includes('障害');
+      });
+    }
+    return masters; // 臨時の補助金：全顧問先
   }, [mainTab, masters]);
 
   /* ── データ変更ハンドラ（Firebase に書き込み → onValue が state を更新） ── */
