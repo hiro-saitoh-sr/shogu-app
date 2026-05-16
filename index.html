@@ -962,6 +962,12 @@ function App() {
     return subTab === '計画書' ? rinjiPlan : rinjiReport;
   }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport, baseupPlan, baseupInterim, baseupReport]);
 
+  /* ベースアップ評価料では業種「医療」の顧問先のみに絞り込む */
+  const deliveryMasters = useMemo(() => {
+    if (mainTab === 'ベースアップ評価料') return masters.filter(m => parseGyoshu(m['業種']).includes('医療'));
+    return masters;
+  }, [mainTab, masters]);
+
   /* ── データ変更ハンドラ（Firebase に書き込み → onValue が state を更新） ── */
   function handleMastersSave(rows) {
     db.ref('shogu/masters').set(rows).catch(e => alert('保存エラー: ' + e.message));
@@ -1093,7 +1099,7 @@ function App() {
         ) : (
           <DeliveryView
             rows={currentRows}
-            masters={masters}
+            masters={deliveryMasters}
             isRinji={mainTab === '臨時の補助金'}
             docType={subTab}
             selNendo={selNendo}
