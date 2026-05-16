@@ -532,8 +532,22 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
         </h2>
 
         {/* 共通フィールド */}
+        {/* 1段目：顧問先ナンバー（読取専用）／年度（読取専用） */}
+        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'14px'}}>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>顧問先ナンバー</label>
+            <input value={shared['顧問先ナンバー']} readOnly
+              style={{background:'#f3f4f6', color:'#6b7280', cursor:'default'}} />
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>年度</label>
+            <input value={shared['年度']} readOnly
+              style={{background:'#f3f4f6', color:'#6b7280', cursor:'default'}} />
+          </div>
+        </div>
+        {/* 2段目：顧問先名（ドロップダウン）／提出担当（ドロップダウン） */}
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px', marginBottom:'20px'}}>
-          <div style={{gridColumn:'1/-1'}}>
+          <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>顧問先名</label>
             <select value={shared['顧問先名']} onChange={e => {
               const name = e.target.value;
@@ -542,18 +556,6 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
             }}>
               <option value="">-- 選択 --</option>
               {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
-            </select>
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>顧問先ナンバー</label>
-            <input value={shared['顧問先ナンバー']} readOnly
-              style={{background:'#f3f4f6', color:'#6b7280', cursor:'default'}} />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>年度</label>
-            <select value={shared['年度']} onChange={e => setS('年度', e.target.value)}>
-              <option value="">-- 選択 --</option>
-              {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
             </select>
           </div>
           <div>
@@ -775,7 +777,10 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <button onClick={() => setSelNendo(n => n + 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
-        <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add', defaultNendo: filterNendo})}>＋ 追加</button>
+        <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => {
+          if (!filterNendo) { alert('先に年度を選択してください'); return; }
+          setModal({mode:'add', defaultNendo: filterNendo});
+        }}>＋ 追加</button>
       </div>
       {/* ── フィルターバー ── */}
       <div style={{display:'flex', gap:'10px', marginBottom:'12px', flexWrap:'wrap', alignItems:'center', background:'white', border:'1px solid #e5e7eb', borderRadius:'8px', padding:'10px 14px'}}>
