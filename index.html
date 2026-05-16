@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+﻿﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -244,7 +244,7 @@ function MasterModal({ initial, onSave, onClose }) {
   const initGyoshu = parseGyoshu(initial?.['業種']);
   const [form, setForm] = useState(initial
     ? { ...initial, 業種: initGyoshu }
-    : { 顧問先ナンバー:'', 顧問先名:'', 業種:[], 賃金改善実施期間:'４月～３月' });
+    : { 顧問先ナンバー:'', 顧問先名:'', 業種:[], 賃金改善実施期間:'４月～３月', 代表者名:'', 担当者名:'', メールアドレス:'', 月額報酬金額:'', メモ:'' });
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
 
   function toggleGyoshu(g) {
@@ -284,6 +284,30 @@ function MasterModal({ initial, onSave, onClose }) {
               {CHINGIN_OPTIONS.map(o => <option key={o}>{o}</option>)}
             </select>
           </div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px'}}>
+            <div>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>代表者名</label>
+              <input value={form['代表者名'] || ''} onChange={e => set('代表者名', e.target.value)} placeholder="代表者名を入力" />
+            </div>
+            <div>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>担当者名</label>
+              <input value={form['担当者名'] || ''} onChange={e => set('担当者名', e.target.value)} placeholder="担当者名を入力" />
+            </div>
+          </div>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px'}}>
+            <div>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>メールアドレス</label>
+              <input type="email" value={form['メールアドレス'] || ''} onChange={e => set('メールアドレス', e.target.value)} placeholder="example@mail.com" />
+            </div>
+            <div>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>月額報酬金額</label>
+              <input type="number" value={form['月額報酬金額'] || ''} onChange={e => set('月額報酬金額', e.target.value)} placeholder="例：50000" />
+            </div>
+          </div>
+          <div>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>メモ</label>
+            <textarea value={form['メモ'] || ''} onChange={e => set('メモ', e.target.value)} placeholder="メモを入力" rows={3} style={{resize:'vertical'}} />
+          </div>
         </div>
         <div style={{display:'flex', gap:'12px', marginTop:'28px', justifyContent:'flex-end'}}>
           <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
@@ -294,8 +318,90 @@ function MasterModal({ initial, onSave, onClose }) {
   );
 }
 
+function EmailCopyCell({ email }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(email).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }
+  return (
+    <span style={{display:'inline-flex', alignItems:'center', gap:'6px'}}>
+      <span>{email}</span>
+      <button onClick={handleCopy}
+        style={{fontSize:'11px', padding:'1px 6px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'3px', background:'#f9fafb', fontFamily:'inherit', color:'#374151', lineHeight:'1.4', whiteSpace:'nowrap', flexShrink:0}}>
+        {copied ? '✓' : 'コピー'}
+      </button>
+    </span>
+  );
+}
+
+function MasterDetailModal({ row, onClose, onEdit }) {
+  const labelStyle = {fontWeight:'700', color:'#6b7280', fontSize:'15px', minWidth:'130px', flexShrink:0};
+  const valueStyle = {fontWeight:'500', fontSize:'18px', color:'#000000'};
+  const rowStyle   = {display:'flex', alignItems:'flex-start', gap:'12px', padding:'10px 0', borderBottom:'1px solid #f3f4f6'};
+
+  const gyoshuList = parseGyoshu(row['業種']);
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{width:'600px'}} onClick={e => e.stopPropagation()}>
+        <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px'}}>
+          <h2 style={{fontSize:'20px', fontWeight:'800'}}>顧問先詳細</h2>
+          <button className="btn btn-secondary" style={{padding:'4px 14px', fontSize:'15px'}} onClick={onEdit}>編集</button>
+        </div>
+        <div style={{display:'flex', flexDirection:'column'}}>
+          <div style={rowStyle}>
+            <span style={labelStyle}>顧問先ナンバー</span>
+            <span style={valueStyle}>{row['顧問先ナンバー'] || '－'}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>顧問先名</span>
+            <span style={{...valueStyle, fontWeight:'700'}}>{row['顧問先名'] || '－'}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>業種</span>
+            <span style={{display:'inline-flex', gap:'4px', flexWrap:'wrap'}}>
+              {gyoshuList.length > 0 ? gyoshuList.map(g => (
+                <span key={g} style={{...kubunBadgeStyle(g), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'15px'}}>{g}</span>
+              )) : <span style={valueStyle}>－</span>}
+            </span>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>代表者名</span>
+            <span style={valueStyle}>{row['代表者名'] || '－'}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>担当者名</span>
+            <span style={valueStyle}>{row['担当者名'] || '－'}</span>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>メールアドレス</span>
+            <span style={valueStyle}>
+              {row['メールアドレス'] ? <EmailCopyCell email={row['メールアドレス']} /> : '－'}
+            </span>
+          </div>
+          <div style={rowStyle}>
+            <span style={labelStyle}>月額報酬金額</span>
+            <span style={valueStyle}>{row['月額報酬金額'] ? Number(row['月額報酬金額']).toLocaleString() + ' 円' : '－'}</span>
+          </div>
+          <div style={{...rowStyle, borderBottom:'none', alignItems:'flex-start'}}>
+            <span style={labelStyle}>メモ</span>
+            <span style={{...valueStyle, whiteSpace:'pre-wrap', lineHeight:'1.7'}}>{row['メモ'] || '－'}</span>
+          </div>
+        </div>
+        <div style={{display:'flex', justifyContent:'flex-end', marginTop:'20px'}}>
+          <button className="btn btn-secondary" onClick={onClose}>閉じる</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function MasterView({ masters, onSave, onDelete, onRestore }) {
   const [modal, setModal] = useState(null);
+  const [detailRow, setDetailRow] = useState(null);
   const [filterName, setFilterName] = useState('');
   const [filterGyoshu, setFilterGyoshu] = useState('');
   const [showCancelled, setShowCancelled] = useState(false);
@@ -352,19 +458,24 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
         <table style={{width:'100%', borderCollapse:'collapse'}}>
           <thead>
             <tr>
-              {['顧問先ナンバー','顧問先名','業種','賃金改善実施期間','操作'].map(h => (
+              {['顧問先ナンバー','顧問先名','業種','賃金改善実施期間','メールアドレス','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={5} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
+              <tr><td colSpan={6} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
             )}
             {displayed.map(r => (
               <tr key={r.id} style={{borderBottom:'1px solid #e5e7eb', ...(r['契約解除']==='1' ? {background:'#f3f4f6', opacity:0.65} : {})}}>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先ナンバー']}</td>
-                <td style={{padding:'10px 14px', verticalAlign:'middle', ...(r['契約解除']==='1' ? {textDecoration:'line-through', color:'#6b7280'} : {})}}>{r['顧問先名']}</td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
+                  <span
+                    style={{cursor:'pointer', color: r['契約解除']==='1' ? '#6b7280' : '#15803d', textDecoration: r['契約解除']==='1' ? 'line-through' : 'underline', fontWeight:'700'}}
+                    onClick={() => setDetailRow(r)}
+                  >{r['顧問先名']}</span>
+                </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
                   <span style={{display:'inline-flex', gap:'4px', flexWrap:'wrap', alignItems:'center'}}>
                     {parseGyoshu(r['業種']).map(g => (
@@ -373,6 +484,11 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
                   </span>
                 </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
+                <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
+                  {r['メールアドレス'] ? (
+                    <EmailCopyCell email={r['メールアドレス']} />
+                  ) : ''}
+                </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
                   {r['契約解除'] === '1' ? (
                     <button className="btn btn-primary" style={{padding:'4px 12px', fontSize:'14px'}}
@@ -396,6 +512,13 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
           initial={modal.mode === 'edit' ? modal.row : null}
           onSave={handleSave}
           onClose={() => setModal(null)}
+        />
+      )}
+      {detailRow && (
+        <MasterDetailModal
+          row={detailRow}
+          onClose={() => setDetailRow(null)}
+          onEdit={() => { setModal({mode:'edit', row:detailRow}); setDetailRow(null); }}
         />
       )}
     </div>
@@ -1422,4 +1545,5 @@ root.render(<App />);
 </script>
 </body>
 </html>
+
 
