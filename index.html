@@ -48,7 +48,7 @@
 
     /* ── テーブル ── */
     th { position: sticky; top: 0; z-index: 10; font-size: 18px; color: #000000; font-weight: 700; background: #f9fafb; }
-    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 19px !important; color: #000000 !important; font-weight: 500 !important; }
+    td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 19px !important; color: #000000 !important; font-weight: 500 !important; vertical-align: middle !important; }
     table { color: #000000; font-size: 19px; }
     tr:hover td { background: #ecfdf5; }
 
@@ -756,7 +756,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
 
   const thS = {padding:'10px 12px', textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
   const cell = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...(bg ? {background:bg} : {})});
-  const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'top', paddingTop:'12px', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
+  const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
 
   return (
     <div>
