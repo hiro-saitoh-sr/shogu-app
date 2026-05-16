@@ -660,6 +660,24 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
   const dateLabel = '納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
 
+  /* 絞り込み用：登録済みレコードの顧問先を重複排除・顧問先ナンバー順に並べる */
+  const filterNameOptions = useMemo(() => {
+    const seen = new Set();
+    const result = [];
+    groups.forEach(g => {
+      if (g.顧問先名 && !seen.has(g.顧問先名)) {
+        seen.add(g.顧問先名);
+        result.push({ 顧問先名: g.顧問先名, 顧問先ナンバー: g['顧問先ナンバー'] });
+      }
+    });
+    result.sort((a, b) => {
+      const na = (a['顧問先ナンバー'] !== '' && a['顧問先ナンバー'] != null) ? Number(a['顧問先ナンバー']) : Infinity;
+      const nb = (b['顧問先ナンバー'] !== '' && b['顧問先ナンバー'] != null) ? Number(b['顧問先ナンバー']) : Infinity;
+      return na - nb;
+    });
+    return result;
+  }, [groups]);
+
   const displayed = useMemo(() => {
     let result = groups;
     if (selNendo) {
@@ -715,7 +733,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <select value={filterName} onChange={e => setFilterName(e.target.value)}
           style={{width:'284px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">顧問先名（すべて）</option>
-          {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
+          {filterNameOptions.map(m => <option key={m.顧問先名} value={m.顧問先名}>{m.顧問先名}</option>)}
         </select>
         <select value={filterNendo} onChange={e => setFilterNendo(e.target.value)}
           style={{width:'150px', padding:'6px 10px', fontSize:'16px'}}>
@@ -1103,6 +1121,7 @@ function App() {
           <MasterView masters={masters} onSave={handleMastersSave} onDelete={handleMasterDelete} onRestore={handleMasterRestore} />
         ) : (
           <DeliveryView
+            key={mainTab + '-' + subTab}
             rows={currentRows}
             masters={deliveryMasters}
             isRinji={mainTab === '臨時の補助金'}
