@@ -481,12 +481,12 @@ function isRowComplete(g, it) {
 }
 
 /* ── グループ編集モーダル ── */
-function DeliveryModal({ initial, allRows, masters, isRinji, isBaseup, docType, onSave, onClose }) {
+function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBaseup, docType, onSave, onClose }) {
   const dateLabel = '納品日';
   const emptyItem = () => ({ 保険者id: Date.now(), 区分: isBaseup ? '医療' : '介護保険', 提出先:'', サービス種別:'', 提出先URL:'', deadlineDate:'' });
 
   const initGroup = initial || {
-    グループid: null, 顧問先名:'', 顧問先ナンバー:'', 年度:'', 打ち合わせ日:'', 納品日:'',
+    グループid: null, 顧問先名:'', 顧問先ナンバー:'', 年度: defaultNendo || '', 打ち合わせ日:'', 納品日:'',
     提出担当:'自社で提出', 提出日:'', submittedDate:'', items:[emptyItem()],
   };
 
@@ -752,7 +752,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <button onClick={() => setSelNendo(n => n + 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
-        <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add'})}>＋ 追加</button>
+        <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add', defaultNendo: filterNendo})}>＋ 追加</button>
       </div>
       {/* ── フィルターバー ── */}
       <div style={{display:'flex', gap:'10px', marginBottom:'12px', flexWrap:'wrap', alignItems:'center', background:'white', border:'1px solid #e5e7eb', borderRadius:'8px', padding:'10px 14px'}}>
@@ -799,11 +799,10 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
             {displayed.map(g => {
               const rs = g.items.length;
               const cancelled = g['取消'] === '1';
-              const groupDone = !cancelled && g.items.every(it => isRowComplete(g, it));
               const hasNohon  = !!g['納品日'];
-              const gBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : hasNohon ? '#fefce8' : undefined);
+              const gBg = cancelled ? '#e5e7eb' : (hasNohon ? '#fefce8' : undefined);
               return g.items.map((it, idx) => {
-                const rBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : hasNohon ? '#fefce8' : undefined);
+                const rBg = cancelled ? '#e5e7eb' : (hasNohon ? '#fefce8' : undefined);
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
@@ -875,6 +874,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
       {modal && (
         <DeliveryModal
           initial={modal.mode === 'edit' ? modal.group : null}
+          defaultNendo={modal.mode === 'add' ? (modal.defaultNendo || '') : undefined}
           allRows={rows}
           masters={masters}
           isRinji={isRinji}
