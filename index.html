@@ -551,31 +551,10 @@ function DeliveryModal({ initial, allRows, masters, isRinji, isBaseup, docType, 
             </select>
           </div>
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>打ち合わせ日</label>
-            <input type="date" value={shared['打ち合わせ日']} onChange={e => setS('打ち合わせ日', e.target.value)} />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>{dateLabel}</label>
-            <input type="date" value={shared['納品日']} onChange={e => setS('納品日', e.target.value)} />
-          </div>
-          <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出担当</label>
             <select value={shared['提出担当']} onChange={e => setS('提出担当', e.target.value)}>
               {TEISHUTSU_OPTIONS.map(o => <option key={o}>{o}</option>)}
             </select>
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>提出日</label>
-            <label style={{display:'flex', alignItems:'center', gap:'8px', marginBottom:'6px', cursor:'pointer', fontWeight:'500'}}>
-              <input type="checkbox"
-                checked={shared['submittedDate'] === '自社で提出'}
-                onChange={e => setS('submittedDate', e.target.checked ? '自社で提出' : '')}
-                style={{width:'auto'}} />
-              自社で提出
-            </label>
-            {shared['submittedDate'] !== '自社で提出' && (
-              <input type="date" value={shared['submittedDate']} onChange={e => setS('submittedDate', e.target.value)} />
-            )}
           </div>
         </div>
 
@@ -646,10 +625,58 @@ function DeliveryModal({ initial, allRows, masters, isRinji, isBaseup, docType, 
   );
 }
 
+/* ── インライン日付セル ── */
+function InlineDateCell({ value, displayText, onChange }) {
+  const [editing, setEditing] = useState(false);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (editing && inputRef.current) {
+      inputRef.current.focus();
+      try { inputRef.current.showPicker(); } catch(e) {}
+    }
+  }, [editing]);
+
+  function handleChange(e) {
+    onChange(e.target.value);
+    setEditing(false);
+  }
+
+  function handleBlur() {
+    setEditing(false);
+  }
+
+  const label = displayText ?? (value ? fmtDate(value) : '－');
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        type="date"
+        defaultValue={value || ''}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        style={{width:'130px', fontSize:'14px', padding:'4px 6px', border:'1px solid #d1d5db', borderRadius:'4px', fontFamily:'inherit'}}
+      />
+    );
+  }
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      title="クリックして日付を入力"
+      style={{cursor:'pointer', display:'inline-block', minWidth:'72px', padding:'2px 6px',
+        color: (displayText || value) ? '#111827' : '#9ca3af',
+        borderBottom: '1px dashed #9ca3af',
+      }}
+    >
+      {label}
+    </span>
+  );
+}
+
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore }) {
+function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange }) {
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
@@ -773,10 +800,10 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
               const rs = g.items.length;
               const cancelled = g['取消'] === '1';
               const groupDone = !cancelled && g.items.every(it => isRowComplete(g, it));
-              const gBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : undefined);
+              const hasNohon  = !!g['納品日'];
+              const gBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : hasNohon ? '#fefce8' : undefined);
               return g.items.map((it, idx) => {
-                const rowDone = !cancelled && isRowComplete(g, it);
-                const rBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : rowDone ? '#fed7aa' : undefined);
+                const rBg = cancelled ? '#e5e7eb' : (groupDone ? '#fef08a' : hasNohon ? '#fefce8' : undefined);
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
@@ -810,11 +837,19 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     <td style={cell(rBg)}>{fmtDate(it['deadlineDate'])}</td>
                     {/* 進捗セル（結合） */}
                     {idx === 0 && <>
-                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['打ち合わせ日'])}</td>
-                      <td rowSpan={rs} style={merged(gBg)}>{fmtDate(g['納品日'])}</td>
+                      <td rowSpan={rs} style={merged(gBg)}>
+                        <InlineDateCell value={g['打ち合わせ日']} onChange={v => onGroupDateChange(g.グループid, '打ち合わせ日', v)} />
+                      </td>
+                      <td rowSpan={rs} style={merged(gBg)}>
+                        <InlineDateCell value={g['納品日']} onChange={v => onGroupDateChange(g.グループid, '納品日', v)} />
+                      </td>
                       <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px'}}>{g['提出担当']}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
-                        {g['submittedDate'] === '自社で提出' ? '自社で提出' : fmtDate(g['submittedDate'])}
+                        <InlineDateCell
+                          value={g['submittedDate'] === '自社で提出' ? '' : (g['submittedDate'] || '')}
+                          displayText={g['submittedDate'] === '自社で提出' ? '自社で提出' : null}
+                          onChange={v => onGroupDateChange(g.グループid, 'submittedDate', v)}
+                        />
                       </td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
@@ -1012,6 +1047,10 @@ function App() {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: ''} : r);
     db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
   }
+  function handleDeliveryGroupDateChange(gid, field, value) {
+    const updated = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, [field]: value} : r);
+    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(updated).catch(e => alert('保存エラー: ' + e.message));
+  }
 
   /* ── ログイン前 ── */
   if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
@@ -1135,6 +1174,7 @@ function App() {
             onSave={handleDeliverySave}
             onDelete={handleDeliveryDelete}
             onRestore={handleDeliveryRestore}
+            onGroupDateChange={handleDeliveryGroupDateChange}
           />
         )}
       </div>
