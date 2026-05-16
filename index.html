@@ -701,7 +701,7 @@ function CopyButton({ url }) {
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange }) {
+function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows }) {
   const [modal, setModal] = useState(null);
   const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
@@ -761,6 +761,45 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     setModal(null);
   }
 
+  function makeCopiedGroups(srcGroups, newNendo, destRows) {
+    const allGids = destRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0)).filter(n => !isNaN(n));
+    let nextGid = allGids.length > 0 ? Math.max(...allGids) + 1 : 1;
+    return srcGroups.map(g => ({
+      ...g,
+      グループid:   nextGid++,
+      年度:          newNendo,
+      打ち合わせ日: '',
+      取消:          '',
+      items: g.items.map((it, i) => ({
+        ...it,
+        保険者id:      i + 1,
+        deadlineDate:  '',
+        deliveryDate:  '',
+        selfSubmit:    false,
+        submittedDate: '',
+      })),
+    }));
+  }
+
+  function handleCopyFromPrevYear() {
+    if (!filterNendo) return;
+    const srcNendo = String(Number(filterNendo) - 1);
+    const srcGroups = flatToGroups(rows.filter(r => r['年度'] === srcNendo && r['取消'] !== '1'));
+    if (srcGroups.length === 0) { alert(`${srcNendo}年度の計画書が見つかりません`); return; }
+    if (!confirm(`${srcNendo}年度の計画書を${filterNendo}年度にコピーします。よろしいですか？`)) return;
+    const newGroups = makeCopiedGroups(srcGroups, filterNendo, rows);
+    onSave(groupsToFlat([...flatToGroups(rows), ...newGroups]));
+  }
+
+  function handleCopyFromPlan() {
+    if (!filterNendo) return;
+    const srcGroups = flatToGroups((planRows || []).filter(r => r['年度'] === filterNendo && r['取消'] !== '1'));
+    if (srcGroups.length === 0) { alert(`${filterNendo}年度の計画書が見つかりません`); return; }
+    if (!confirm(`${filterNendo}年度の計画書を${docType}にコピーします。よろしいですか？`)) return;
+    const newGroups = makeCopiedGroups(srcGroups, filterNendo, rows);
+    onSave(groupsToFlat([...flatToGroups(rows), ...newGroups]));
+  }
+
   const thS = {padding:'10px 12px', textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
   const cell = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...(bg ? {background:bg} : {})});
   const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
@@ -777,6 +816,25 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <button onClick={() => setSelNendo(n => n + 1)}
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
+        {docType === '計画書' ? (
+          <button
+            className="btn btn-secondary"
+            style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
+            disabled={!filterNendo}
+            title={filterNendo ? `${Number(filterNendo)-1}年度からコピー` : '先に年度で絞り込んでください'}
+            onClick={handleCopyFromPrevYear}>
+            前年度からコピー
+          </button>
+        ) : (
+          <button
+            className="btn btn-secondary"
+            style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
+            disabled={!filterNendo}
+            title={filterNendo ? `${filterNendo}年度の計画書からコピー` : '先に年度で絞り込んでください'}
+            onClick={handleCopyFromPlan}>
+            計画書からコピー
+          </button>
+        )}
         <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add', defaultNendo: String(selNendo)})}>＋ 追加</button>
       </div>
       {/* ── フィルターバー ── */}
@@ -1222,6 +1280,7 @@ function App() {
             onRestore={handleDeliveryRestore}
             onGroupDateChange={handleDeliveryGroupDateChange}
             onItemFieldChange={handleDeliveryItemFieldChange}
+            planRows={mainTab === '処遇改善加算' ? shoguPlan : mainTab === 'ベースアップ評価料' ? baseupPlan : rinjiPlan}
           />
         )}
       </div>
