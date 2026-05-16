@@ -230,7 +230,7 @@ const CURRENT_FY = (() => {
 /* ══════════════════════════════════════════
    顧問先マスタ画面
 ══════════════════════════════════════════ */
-const GYOSHU_OPTIONS = ['介護保険', '障害', '介護保険+障害'];
+const GYOSHU_OPTIONS = ['介護保険', '障害', '介護保険+障害', '医療'];
 
 function MasterModal({ initial, onSave, onClose }) {
   const [form, setForm] = useState(initial || { 顧問先ナンバー:'', 顧問先名:'', 業種:'介護保険', 賃金改善実施期間:'４月～３月' });
@@ -863,12 +863,15 @@ function App() {
   function setView(v)     { setViewRaw(v);     try { localStorage.setItem(TAB_SK, JSON.stringify({...(JSON.parse(localStorage.getItem(TAB_SK))||{}), view:v}));     } catch(e){} }
 
   /* data — Firebase onValue で自動同期 */
-  const [masters,      setMasters]      = useState([]);
-  const [shoguPlan,    setShoguPlan]    = useState([]);
-  const [shoguReport,  setShoguReport]  = useState([]);
-  const [rinjiPlan,    setRinjiPlan]    = useState([]);
-  const [rinjiReport,  setRinjiReport]  = useState([]);
-  const [syncStatus,   setSyncStatus]   = useState('loading'); // loading|connected|error
+  const [masters,       setMasters]       = useState([]);
+  const [shoguPlan,     setShoguPlan]     = useState([]);
+  const [shoguReport,   setShoguReport]   = useState([]);
+  const [rinjiPlan,     setRinjiPlan]     = useState([]);
+  const [rinjiReport,   setRinjiReport]   = useState([]);
+  const [baseupPlan,    setBaseupPlan]    = useState([]);
+  const [baseupInterim, setBaseupInterim] = useState([]);
+  const [baseupReport,  setBaseupReport]  = useState([]);
+  const [syncStatus,    setSyncStatus]    = useState('loading'); // loading|connected|error
 
   /* ── Firebase リスナー設定（Firebase Auth 確認後に起動） ── */
   useEffect(() => {
@@ -877,11 +880,14 @@ function App() {
     setSyncStatus('loading');
 
     const refs = {
-      masters:     db.ref('shogu/masters'),
-      shoguPlan:   db.ref('shogu/deliveries/shoguPlan'),
-      shoguReport: db.ref('shogu/deliveries/shoguReport'),
-      rinjiPlan:   db.ref('shogu/deliveries/rinjiPlan'),
-      rinjiReport: db.ref('shogu/deliveries/rinjiReport'),
+      masters:      db.ref('shogu/masters'),
+      shoguPlan:    db.ref('shogu/deliveries/shoguPlan'),
+      shoguReport:  db.ref('shogu/deliveries/shoguReport'),
+      rinjiPlan:    db.ref('shogu/deliveries/rinjiPlan'),
+      rinjiReport:  db.ref('shogu/deliveries/rinjiReport'),
+      baseupPlan:   db.ref('shogu/deliveries/baseupPlan'),
+      baseupInterim: db.ref('shogu/deliveries/baseupInterim'),
+      baseupReport: db.ref('shogu/deliveries/baseupReport'),
     };
 
     let listenersActive = false;
@@ -900,10 +906,13 @@ function App() {
         }
       }, () => setSyncStatus('error'));
 
-      refs.shoguPlan.on('value',   (snap) => { setShoguPlan(snapToArray(snap)   || []); }, () => {});
-      refs.shoguReport.on('value', (snap) => { setShoguReport(snapToArray(snap) || []); }, () => {});
-      refs.rinjiPlan.on('value',   (snap) => { setRinjiPlan(snapToArray(snap)   || []); }, () => {});
-      refs.rinjiReport.on('value', (snap) => { setRinjiReport(snapToArray(snap) || []); }, () => {});
+      refs.shoguPlan.on('value',    (snap) => { setShoguPlan(snapToArray(snap)    || []); }, () => {});
+      refs.shoguReport.on('value',  (snap) => { setShoguReport(snapToArray(snap)  || []); }, () => {});
+      refs.rinjiPlan.on('value',    (snap) => { setRinjiPlan(snapToArray(snap)    || []); }, () => {});
+      refs.rinjiReport.on('value',  (snap) => { setRinjiReport(snapToArray(snap)  || []); }, () => {});
+      refs.baseupPlan.on('value',   (snap) => { setBaseupPlan(snapToArray(snap)   || []); }, () => {});
+      refs.baseupInterim.on('value',(snap) => { setBaseupInterim(snapToArray(snap)|| []); }, () => {});
+      refs.baseupReport.on('value', (snap) => { setBaseupReport(snapToArray(snap) || []); }, () => {});
     }
 
     // Firebase Auth の状態復元を待ってからリスナーを起動（ページリロード時の権限エラー防止）
@@ -920,13 +929,23 @@ function App() {
   /* ── 現在の届出パス ── */
   const currentDeliveryPath = useMemo(() => {
     if (mainTab === '処遇改善加算') return subTab === '計画書' ? 'shoguPlan' : 'shoguReport';
+    if (mainTab === 'ベースアップ評価料') {
+      if (subTab === '計画書') return 'baseupPlan';
+      if (subTab === '中間報告') return 'baseupInterim';
+      return 'baseupReport';
+    }
     return subTab === '計画書' ? 'rinjiPlan' : 'rinjiReport';
   }, [mainTab, subTab]);
 
   const currentRows = useMemo(() => {
-    if (mainTab === '処遇改善加算') return subTab === '計画書' ? shoguPlan    : shoguReport;
+    if (mainTab === '処遇改善加算') return subTab === '計画書' ? shoguPlan : shoguReport;
+    if (mainTab === 'ベースアップ評価料') {
+      if (subTab === '計画書') return baseupPlan;
+      if (subTab === '中間報告') return baseupInterim;
+      return baseupReport;
+    }
     return subTab === '計画書' ? rinjiPlan : rinjiReport;
-  }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport]);
+  }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport, baseupPlan, baseupInterim, baseupReport]);
 
   /* ── データ変更ハンドラ（Firebase に書き込み → onValue が state を更新） ── */
   function handleMastersSave(rows) {
@@ -998,8 +1017,18 @@ function App() {
               color:        view==='delivery' && mainTab==='処遇改善加算' ? '#854d0e' : '#000000',
               fontWeight:   view==='delivery' && mainTab==='処遇改善加算' ? '800' : '600',
             }}
-            onClick={() => { setView('delivery'); setMainTab('処遇改善加算'); }}>
+            onClick={() => { setView('delivery'); setMainTab('処遇改善加算'); setSubTab('計画書'); }}>
             処遇改善加算
+          </button>
+          <button className="tab-btn"
+            style={{padding:'10px 22px', border:'none', cursor:'pointer', borderRadius:'8px 8px 0 0', whiteSpace:'nowrap',
+              background:   view==='delivery' && mainTab==='ベースアップ評価料' ? '#ecfeff' : 'transparent',
+              borderBottom: view==='delivery' && mainTab==='ベースアップ評価料' ? '3px solid #0891b2' : '3px solid transparent',
+              color:        view==='delivery' && mainTab==='ベースアップ評価料' ? '#155e75' : '#000000',
+              fontWeight:   view==='delivery' && mainTab==='ベースアップ評価料' ? '800' : '600',
+            }}
+            onClick={() => { setView('delivery'); setMainTab('ベースアップ評価料'); setSubTab('計画書'); }}>
+            ベースアップ評価料
           </button>
           <button className="tab-btn"
             style={{padding:'10px 22px', border:'none', cursor:'pointer', borderRadius:'8px 8px 0 0', whiteSpace:'nowrap',
@@ -1008,7 +1037,7 @@ function App() {
               color:        view==='delivery' && mainTab==='臨時の補助金' ? '#6b21a8' : '#000000',
               fontWeight:   view==='delivery' && mainTab==='臨時の補助金' ? '800' : '600',
             }}
-            onClick={() => { setView('delivery'); setMainTab('臨時の補助金'); }}>
+            onClick={() => { setView('delivery'); setMainTab('臨時の補助金'); setSubTab('計画書'); }}>
             臨時の補助金
           </button>
           <button className="tab-btn"
@@ -1024,10 +1053,10 @@ function App() {
         </nav>
       </header>
 
-      {/* ── サブタブ（計画書 / 実績報告書） ── */}
+      {/* ── サブタブ（計画書 / [中間報告] / 実績報告） ── */}
       {view === 'delivery' && (
         <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'4px'}}>
-          {['計画書','実績報告書'].map(tab => (
+          {(mainTab === 'ベースアップ評価料' ? ['計画書','中間報告','実績報告'] : ['計画書','実績報告']).map(tab => (
             <button key={tab} className="tab-btn"
               style={{padding:'8px 20px', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer',
                 background:   subTab===tab ? '#dcfce7' : 'transparent',
