@@ -1,4 +1,4 @@
-﻿﻿<!DOCTYPE html>
+﻿﻿﻿<!DOCTYPE html>
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
@@ -252,64 +252,76 @@ function MasterModal({ initial, onSave, onClose }) {
     set('業種', cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g]);
   }
 
+  const lbl = {fontWeight:'700', display:'block', marginBottom:'4px', fontSize:'16px'};
+  const g12 = {display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'};
+
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-box" onClick={e => e.stopPropagation()}>
-        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'24px'}}>
+      <div className="modal-box" style={{width:'760px', padding:'24px'}} onClick={e => e.stopPropagation()}>
+        <h2 style={{fontSize:'19px', fontWeight:'800', marginBottom:'16px'}}>
           {initial ? '顧問先を編集' : '顧問先を追加'}
         </h2>
-        <div style={{display:'flex', flexDirection:'column', gap:'16px'}}>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>顧問先ナンバー</label>
-            <input type="number" value={form['顧問先ナンバー']} onChange={e => set('顧問先ナンバー', e.target.value)} placeholder="例：001" />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>顧問先名</label>
-            <input value={form['顧問先名']} onChange={e => set('顧問先名', e.target.value)} placeholder="顧問先名を入力" />
-          </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>業種</label>
-            <div style={{display:'flex', gap:'20px', flexWrap:'wrap', padding:'8px 0'}}>
-              {GYOSHU_OPTIONS.map(o => (
-                <label key={o} style={{display:'flex', alignItems:'center', gap:'7px', cursor:'pointer', fontWeight:'500', fontSize:'18px'}}>
-                  <input type="checkbox" checked={form['業種'].includes(o)} onChange={() => toggleGyoshu(o)} style={{width:'18px', height:'18px'}} />
-                  {o}
-                </label>
-              ))}
+        <div style={{display:'flex', flexDirection:'column', gap:'12px'}}>
+          {/* 行1: 顧問先ナンバー ／ 顧問先名 */}
+          <div style={g12}>
+            <div>
+              <label style={lbl}>顧問先ナンバー</label>
+              <input type="number" value={form['顧問先ナンバー']} onChange={e => set('顧問先ナンバー', e.target.value)} placeholder="例：001" />
+            </div>
+            <div>
+              <label style={lbl}>顧問先名</label>
+              <input value={form['顧問先名']} onChange={e => set('顧問先名', e.target.value)} placeholder="顧問先名を入力" />
             </div>
           </div>
-          <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>賃金改善実施期間</label>
-            <select value={form['賃金改善実施期間']} onChange={e => set('賃金改善実施期間', e.target.value)}>
-              {CHINGIN_OPTIONS.map(o => <option key={o}>{o}</option>)}
-            </select>
-          </div>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px'}}>
+          {/* 行2: 業種 ／ 賃金改善実施期間 */}
+          <div style={g12}>
             <div>
-              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>代表者名</label>
+              <label style={lbl}>業種</label>
+              <div style={{display:'flex', gap:'16px', flexWrap:'wrap', padding:'6px 0'}}>
+                {GYOSHU_OPTIONS.map(o => (
+                  <label key={o} style={{display:'flex', alignItems:'center', gap:'6px', cursor:'pointer', fontWeight:'500', fontSize:'17px'}}>
+                    <input type="checkbox" checked={form['業種'].includes(o)} onChange={() => toggleGyoshu(o)} style={{width:'17px', height:'17px'}} />
+                    {o}
+                  </label>
+                ))}
+              </div>
+            </div>
+            <div>
+              <label style={lbl}>賃金改善実施期間</label>
+              <select value={form['賃金改善実施期間']} onChange={e => set('賃金改善実施期間', e.target.value)}>
+                {CHINGIN_OPTIONS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </div>
+          </div>
+          {/* 行3: 代表者名 ／ 担当者名 */}
+          <div style={g12}>
+            <div>
+              <label style={lbl}>代表者名</label>
               <input value={form['代表者名'] || ''} onChange={e => set('代表者名', e.target.value)} placeholder="代表者名を入力" />
             </div>
             <div>
-              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>担当者名</label>
+              <label style={lbl}>担当者名</label>
               <input value={form['担当者名'] || ''} onChange={e => set('担当者名', e.target.value)} placeholder="担当者名を入力" />
             </div>
           </div>
-          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'14px'}}>
+          {/* 行4: メールアドレス ／ 月額報酬金額 */}
+          <div style={g12}>
             <div>
-              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>メールアドレス</label>
+              <label style={lbl}>メールアドレス</label>
               <input type="email" value={form['メールアドレス'] || ''} onChange={e => set('メールアドレス', e.target.value)} placeholder="example@mail.com" />
             </div>
             <div>
-              <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>月額報酬金額</label>
+              <label style={lbl}>月額報酬金額</label>
               <input type="number" value={form['月額報酬金額'] || ''} onChange={e => set('月額報酬金額', e.target.value)} placeholder="例：50000" />
             </div>
           </div>
+          {/* 行5: メモ */}
           <div>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>メモ</label>
-            <textarea value={form['メモ'] || ''} onChange={e => set('メモ', e.target.value)} placeholder="メモを入力" rows={3} style={{resize:'vertical'}} />
+            <label style={lbl}>メモ</label>
+            <textarea value={form['メモ'] || ''} onChange={e => set('メモ', e.target.value)} placeholder="メモを入力" rows={2} style={{resize:'vertical'}} />
           </div>
         </div>
-        <div style={{display:'flex', gap:'12px', marginTop:'28px', justifyContent:'flex-end'}}>
+        <div style={{display:'flex', gap:'12px', marginTop:'18px', justifyContent:'flex-end'}}>
           <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
           <button className="btn btn-primary" onClick={() => { if (!form['顧問先名'].trim()) return; onSave(form); }}>保存</button>
         </div>
@@ -458,14 +470,14 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
         <table style={{width:'100%', borderCollapse:'collapse'}}>
           <thead>
             <tr>
-              {['顧問先ナンバー','顧問先名','業種','賃金改善実施期間','メールアドレス','操作'].map(h => (
+              {['顧問先ナンバー','顧問先名','業種','賃金改善実施期間','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={6} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
+              <tr><td colSpan={5} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>顧問先がありません</td></tr>
             )}
             {displayed.map(r => (
               <tr key={r.id} style={{borderBottom:'1px solid #e5e7eb', ...(r['契約解除']==='1' ? {background:'#f3f4f6', opacity:0.65} : {})}}>
@@ -484,11 +496,6 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
                   </span>
                 </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
-                <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
-                  {r['メールアドレス'] ? (
-                    <EmailCopyCell email={r['メールアドレス']} />
-                  ) : ''}
-                </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle', whiteSpace:'nowrap'}}>
                   {r['契約解除'] === '1' ? (
                     <button className="btn btn-primary" style={{padding:'4px 12px', fontSize:'14px'}}
@@ -1545,5 +1552,6 @@ root.render(<App />);
 </script>
 </body>
 </html>
+
 
 
