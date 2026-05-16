@@ -1100,18 +1100,21 @@ function App() {
       {/* ── サブタブ（計画書 / [中間報告] / 実績報告） ── */}
       {view === 'delivery' && (
         <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'4px'}}>
-          {(mainTab === 'ベースアップ評価料' ? ['計画書','中間報告','実績報告'] : ['計画書','実績報告']).map(tab => (
-            <button key={tab} className="tab-btn"
-              style={{padding:'8px 20px', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer',
-                background:   subTab===tab ? '#dcfce7' : 'transparent',
-                borderBottom: subTab===tab ? '2px solid #16a34a' : '2px solid transparent',
-                color:        subTab===tab ? '#15803d' : '#374151',
-                fontWeight:   subTab===tab ? '700' : '500',
-              }}
-              onClick={() => setSubTab(tab)}>
-              {tab}
-            </button>
-          ))}
+          {(mainTab === 'ベースアップ評価料' ? ['計画書','中間報告','実績報告'] : ['計画書','実績報告']).map(tab => {
+            const ts = ({計画書:{bg:'#2563eb',bd:'#1d4ed8'}, 中間報告:{bg:'#d97706',bd:'#b45309'}, 実績報告:{bg:'#16a34a',bd:'#15803d'}})[tab] || {bg:'#16a34a',bd:'#15803d'};
+            return (
+              <button key={tab} className="tab-btn"
+                style={{padding:'8px 20px', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer',
+                  background:   subTab===tab ? ts.bg : 'transparent',
+                  borderBottom: subTab===tab ? `2px solid ${ts.bd}` : '2px solid transparent',
+                  color:        subTab===tab ? 'white' : '#374151',
+                  fontWeight:   subTab===tab ? '700' : '500',
+                }}
+                onClick={() => setSubTab(tab)}>
+                {tab}
+              </button>
+            );
+          })}
         </div>
       )}
 
