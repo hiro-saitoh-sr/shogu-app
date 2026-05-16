@@ -881,8 +881,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
   }
 
   function handleCopyFromOtherPlan(srcRows, srcLabel) {
-    if (!filterNendo) return;
-    const nendo = filterNendo;
+    const nendo = String(selNendo);
     const srcGroups = flatToGroups((srcRows || []).filter(r => String(r['年度']) === nendo && r['取消'] !== '1'));
     if (srcGroups.length === 0) { alert(`${nendo}年度の${srcLabel}計画書が見つかりません`); return; }
     const alreadyRegistered = new Set(
@@ -918,19 +917,17 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <>
             <button
               className="btn btn-secondary"
-              style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
-              disabled={!filterNendo}
-              title={filterNendo ? `${filterNendo}年度の処遇改善加算計画書からコピー` : '先に年度で絞り込んでください'}
+              style={{padding:'6px 18px'}}
+              title={`${selNendo}年度の処遇改善加算計画書からコピー`}
               onClick={() => handleCopyFromOtherPlan(rinjiShoguPlanRows, '処遇改善加算')}>
               処遇改善加算からコピー
             </button>
             <button
               className="btn btn-secondary"
-              style={{padding:'6px 18px', opacity: filterNendo ? 1 : 0.45}}
-              disabled={!filterNendo}
-              title={filterNendo ? `${filterNendo}年度のベースアップ計画書からコピー` : '先に年度で絞り込んでください'}
-              onClick={() => handleCopyFromOtherPlan(rinjiBaseupPlanRows, 'ベースアップ')}>
-              ベースアップからコピー
+              style={{padding:'6px 18px'}}
+              title={`${selNendo}年度のベースアップ評価料計画書からコピー`}
+              onClick={() => handleCopyFromOtherPlan(rinjiBaseupPlanRows, 'ベースアップ評価料')}>
+              ベースアップ評価料からコピー
             </button>
           </>
         ) : (docType === '計画書' ? (
