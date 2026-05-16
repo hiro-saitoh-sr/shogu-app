@@ -230,11 +230,27 @@ const CURRENT_FY = (() => {
 /* ══════════════════════════════════════════
    顧問先マスタ画面
 ══════════════════════════════════════════ */
-const GYOSHU_OPTIONS = ['介護保険', '障害', '介護保険+障害', '医療'];
+const GYOSHU_OPTIONS = ['介護保険', '障害', '医療'];
+
+/* 業種フィールドを配列に正規化（旧フォーマット文字列に対応） */
+function parseGyoshu(g) {
+  if (!g) return [];
+  if (Array.isArray(g)) return g;
+  if (g.includes('+')) return g.split('+');
+  return [g];
+}
 
 function MasterModal({ initial, onSave, onClose }) {
-  const [form, setForm] = useState(initial || { 顧問先ナンバー:'', 顧問先名:'', 業種:'介護保険', 賃金改善実施期間:'４月～３月' });
+  const initGyoshu = parseGyoshu(initial?.['業種']);
+  const [form, setForm] = useState(initial
+    ? { ...initial, 業種: initGyoshu }
+    : { 顧問先ナンバー:'', 顧問先名:'', 業種:[], 賃金改善実施期間:'４月～３月' });
   const set = (k, v) => setForm(f => ({...f, [k]: v}));
+
+  function toggleGyoshu(g) {
+    const cur = form['業種'];
+    set('業種', cur.includes(g) ? cur.filter(x => x !== g) : [...cur, g]);
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -253,9 +269,14 @@ function MasterModal({ initial, onSave, onClose }) {
           </div>
           <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>業種</label>
-            <select value={form['業種']} onChange={e => set('業種', e.target.value)}>
-              {GYOSHU_OPTIONS.map(o => <option key={o}>{o}</option>)}
-            </select>
+            <div style={{display:'flex', gap:'20px', flexWrap:'wrap', padding:'8px 0'}}>
+              {GYOSHU_OPTIONS.map(o => (
+                <label key={o} style={{display:'flex', alignItems:'center', gap:'7px', cursor:'pointer', fontWeight:'500', fontSize:'18px'}}>
+                  <input type="checkbox" checked={form['業種'].includes(o)} onChange={() => toggleGyoshu(o)} style={{width:'18px', height:'18px'}} />
+                  {o}
+                </label>
+              ))}
+            </div>
           </div>
           <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'6px'}}>賃金改善実施期間</label>
@@ -291,14 +312,14 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
   const displayed = masters.filter(r => {
     if (!showCancelled && r['契約解除'] === '1') return false;
     if (filterName && r['顧問先名'] !== filterName) return false;
-    if (filterGyoshu === '介護保険' && r['業種'] !== '介護保険' && r['業種'] !== '介護保険+障害') return false;
-    if (filterGyoshu === '障害'     && r['業種'] !== '障害'     && r['業種'] !== '介護保険+障害') return false;
+    if (filterGyoshu && !parseGyoshu(r['業種']).includes(filterGyoshu)) return false;
     return true;
   });
 
   function gyoshuBadge(g) {
     if (g === '介護保険') return {background:'#fff7ed', color:'#c2410c', border:'1px solid #fed7aa'};
     if (g === '障害')     return {background:'#f0fdf4', color:'#15803d', border:'1px solid #bbf7d0'};
+    if (g === '医療')     return {background:'#f0f9ff', color:'#0369a1', border:'1px solid #bae6fd'};
     return {background:'#eff6ff', color:'#1d4ed8', border:'1px solid #bfdbfe'};
   }
 
@@ -322,6 +343,7 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
           <option value="">業種（すべて）</option>
           <option value="介護保険">介護保険</option>
           <option value="障害">障害</option>
+          <option value="医療">医療</option>
         </select>
         <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
           <input type="checkbox" checked={showCancelled} onChange={e => setShowCancelled(e.target.checked)} style={{width:'17px', height:'17px'}} />
@@ -347,17 +369,10 @@ function MasterView({ masters, onSave, onDelete, onRestore }) {
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['顧問先ナンバー']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle', ...(r['契約解除']==='1' ? {textDecoration:'line-through', color:'#6b7280'} : {})}}>{r['顧問先名']}</td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>
-                  <span style={{display:'inline-flex', gap:'6px', alignItems:'center'}}>
-                    <span style={{display:'inline-flex', width:'72px', justifyContent:'center'}}>
-                      {(r['業種'] === '介護保険' || r['業種'] === '介護保険+障害') && (
-                        <span style={{...gyoshuBadge('介護保険'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', whiteSpace:'nowrap'}}>介護保険</span>
-                      )}
-                    </span>
-                    <span style={{display:'inline-flex', width:'50px', justifyContent:'center'}}>
-                      {(r['業種'] === '障害' || r['業種'] === '介護保険+障害') && (
-                        <span style={{...gyoshuBadge('障害'), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', whiteSpace:'nowrap'}}>障害</span>
-                      )}
-                    </span>
+                  <span style={{display:'inline-flex', gap:'4px', flexWrap:'wrap', alignItems:'center'}}>
+                    {parseGyoshu(r['業種']).map(g => (
+                      <span key={g} style={{...gyoshuBadge(g), padding:'2px 10px', borderRadius:'4px', fontWeight:'700', fontSize:'14px', whiteSpace:'nowrap'}}>{g}</span>
+                    ))}
                   </span>
                 </td>
                 <td style={{padding:'10px 14px', verticalAlign:'middle'}}>{r['賃金改善実施期間']}</td>
