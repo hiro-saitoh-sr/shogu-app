@@ -871,7 +871,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     </td>
                     {/* 提出担当・操作（グループ結合） */}
                     {idx === 0 && <>
-                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px'}}>{g['提出担当']}</td>
+                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px', whiteSpace:'normal', width:'110px', maxWidth:'110px', overflowWrap:'break-word'}}>{g['提出担当']}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
                           <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
