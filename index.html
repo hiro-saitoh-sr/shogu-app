@@ -349,6 +349,22 @@ function EmailCopyCell({ email }) {
   );
 }
 
+function NameCopyButton({ name }) {
+  const [copied, setCopied] = useState(false);
+  function handleCopy() {
+    navigator.clipboard.writeText(name).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }).catch(() => {});
+  }
+  return (
+    <button onClick={handleCopy}
+      style={{fontSize:'11px', padding:'1px 6px', cursor:'pointer', border:'1px solid #d1d5db', borderRadius:'3px', background:'#f9fafb', fontFamily:'inherit', color:'#374151', lineHeight:'1.4', whiteSpace:'nowrap', flexShrink:0}}>
+      {copied ? '✓' : 'コピー'}
+    </button>
+  );
+}
+
 function MasterDetailModal({ row, onClose, onEdit }) {
   const labelStyle = {fontWeight:'700', color:'#6b7280', fontSize:'15px', minWidth:'130px', flexShrink:0};
   const valueStyle = {fontWeight:'500', fontSize:'18px', color:'#000000'};
@@ -370,7 +386,10 @@ function MasterDetailModal({ row, onClose, onEdit }) {
           </div>
           <div style={rowStyle}>
             <span style={labelStyle}>顧問先名</span>
-            <span style={{...valueStyle, fontWeight:'700'}}>{row['顧問先名'] || '－'}</span>
+            <span style={{display:'inline-flex', alignItems:'center', gap:'6px'}}>
+              <span style={{...valueStyle, fontWeight:'700'}}>{row['顧問先名'] || '－'}</span>
+              {row['顧問先名'] && <NameCopyButton name={row['顧問先名']} />}
+            </span>
           </div>
           <div style={rowStyle}>
             <span style={labelStyle}>業種</span>
