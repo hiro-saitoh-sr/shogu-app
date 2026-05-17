@@ -913,7 +913,6 @@ function CopySelectModal({ title, confirmMsg, srcGroups, onExecute, onClose }) {
 function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows, rinjiShoguPlanRows, rinjiBaseupPlanRows }) {
   const [modal, setModal] = useState(null);
   const [copyModal, setCopyModal] = useState(null); // null | {title, confirmMsg, srcGroups, dstNendo}
-  const [filterDone, setFilterDone] = useState(false);
   const [filterName, setFilterName] = useState('');
   const [filterNendo, setFilterNendo] = useState('');
   const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
@@ -950,9 +949,8 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         return fy === null || fy === selNendo;
       });
     }
-    if (!showCancelled) result = result.filter(g => g['取消'] !== '1');
+    result = result.filter(g => showCancelled ? g['取消'] === '1' : g['取消'] !== '1');
     if (filterNendo) result = result.filter(g => g['年度'] === filterNendo);
-    if (filterDone)  result = result.filter(g => !g.items.every(it => isRowComplete(g, it)));
     if (filterName)  result = result.filter(g => g.顧問先名 === filterName);
     if (filterNohon === '入力済み') result = result.filter(g => g.items.every(it => !!it.deliveryDate));
     if (filterNohon === '未入力')   result = result.filter(g => g.items.some(it => !it.deliveryDate));
@@ -962,7 +960,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
       return na - nb;
     });
     return result;
-  }, [groups, selNendo, showCancelled, filterNendo, filterDone, filterName, filterNohon]);
+  }, [groups, selNendo, showCancelled, filterNendo, filterName, filterNohon]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -1123,10 +1121,6 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
           <option value="入力済み">入力済み</option>
           <option value="未入力">未入力</option>
         </select>
-        <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
-          <input type="checkbox" checked={filterDone} onChange={e => setFilterDone(e.target.checked)} style={{width:'17px', height:'17px'}} />
-          完了を非表示
-        </label>
         <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
           <input type="checkbox" checked={showCancelled} onChange={e => setShowCancelled(e.target.checked)} style={{width:'17px', height:'17px'}} />
           取消済みを表示
