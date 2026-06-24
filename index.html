@@ -51,6 +51,8 @@
     td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 19px !important; color: #000000 !important; font-weight: 500 !important; vertical-align: middle !important; }
     table { color: #000000; font-size: 19px; }
     tr:hover td { background: #ecfdf5; }
+    .delivery-table th { font-size: 13px !important; padding: 6px 8px !important; }
+    .delivery-table td { font-size: 13px !important; padding-top: 6px !important; padding-bottom: 6px !important; padding-left: 8px !important; padding-right: 8px !important; }
 
     /* ── レイアウト ── */
     .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 310px); }
@@ -1050,9 +1052,10 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
     });
   }
 
-  const thS = {padding:'10px 12px', textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
-  const cell = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', ...(bg ? {background:bg} : {})});
-  const merged = bg => ({padding:'8px 12px', whiteSpace:'nowrap', verticalAlign:'middle', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
+  const thS = {textAlign:'center', borderBottom:'2px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
+  const cell = bg => ({verticalAlign:'middle', ...(bg ? {background:bg} : {})});
+  const merged = bg => ({verticalAlign:'middle', borderRight:'1px solid #e5e7eb', ...(bg ? {background:bg} : {})});
+  const nowrap = {whiteSpace:'nowrap'};
 
   return (
     <div>
@@ -1128,7 +1131,21 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table style={{width:'100%', borderCollapse:'collapse', minWidth:'1200px'}}>
+        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'1000px'}}>
+          <colgroup>
+            <col style={{width:'36px'}} />
+            <col style={{width:'140px'}} />
+            <col style={{width:'44px'}} />
+            <col style={{width:'68px'}} />
+            <col style={{width:'110px'}} />
+            <col style={{width:'110px'}} />
+            <col style={{width:'58px'}} />
+            <col style={{width:'84px'}} />
+            <col style={{width:'100px'}} />
+            <col style={{width:'100px'}} />
+            <col style={{width:'72px'}} />
+            <col style={{width:'78px'}} />
+          </colgroup>
           <thead>
             <tr>
               {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','打合せ','納品日','提出担当','操作'].map(h => (
@@ -1153,29 +1170,29 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
                     {/* 顧問先ナンバー・顧問先名・年度（結合） */}
                     {idx === 0 && (
-                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'15px', color:'#374151'}}>
+                      <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center', color:'#374151'}}>
                         {g['顧問先ナンバー'] ?? ''}
                       </td>
                     )}
                     {idx === 0 && (
-                      <td rowSpan={rs} style={merged(gBg)}>
+                      <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word'}}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
                       </td>
                     )}
                     {idx === 0 && (
-                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'15px', fontWeight:'700', color:'#15803d'}}>
+                      <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center', fontWeight:'700', color:'#15803d'}}>
                         {g['年度'] || ''}
                       </td>
                     )}
                     {/* 提出先ごとのセル（区分〜提出期日） */}
-                    <td style={cell(rBg)}>
-                      <span style={{...kubunBadgeStyle(it['区分']), padding:'2px 8px', borderRadius:'4px', fontWeight:'700', fontSize:'14px'}}>
+                    <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
+                      <span style={{...kubunBadgeStyle(it['区分']), padding:'2px 6px', borderRadius:'4px', fontWeight:'700', fontSize:'12px'}}>
                         {it['区分']}
                       </span>
                     </td>
-                    <td style={cell(rBg)}>{it['サービス種別']}</td>
-                    <td style={cell(rBg)}>{it['提出先']}</td>
-                    <td style={cell(rBg)}>
+                    <td style={{...cell(rBg), overflowWrap:'break-word'}}>{it['サービス種別']}</td>
+                    <td style={{...cell(rBg), overflowWrap:'break-word'}}>{it['提出先']}</td>
+                    <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
                       {it['提出先URL'] ? (
                         <span style={{display:'inline-flex', alignItems:'center', gap:'4px'}}>
                           <a href={it['提出先URL']} target="_blank" rel="noopener" style={{color:'#2563eb', textDecoration:'underline'}}>リンク</a>
@@ -1183,21 +1200,21 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                         </span>
                       ) : ''}
                     </td>
-                    <td style={cell(rBg)}>{fmtDate(it['deadlineDate'])}</td>
+                    <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>{fmtDate(it['deadlineDate'])}</td>
                     {/* 打合せ（グループ結合） */}
                     {idx === 0 && (
-                      <td rowSpan={rs} style={merged(gBg)}>
+                      <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center'}}>
                         <InlineDateCell value={g['打ち合わせ日']} onChange={v => onGroupDateChange(g.グループid, '打ち合わせ日', v)} />
                       </td>
                     )}
                     {/* 納品日（行ごと） */}
-                    <td style={cell(rBg)}>
+                    <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
                       <InlineDateCell value={it.deliveryDate}
                         onChange={v => onItemFieldChange(g.グループid, it.保険者id, { deliveryDate: v })} />
                     </td>
                     {/* 提出担当・操作（グループ結合） */}
                     {idx === 0 && <>
-                      <td rowSpan={rs} style={{...merged(gBg), fontSize:'14px', whiteSpace:'normal', width:'110px', maxWidth:'110px', overflowWrap:'break-word'}}>{g['提出担当']}</td>
+                      <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word'}}>{g['提出担当']}</td>
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
                           <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
