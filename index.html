@@ -1159,13 +1159,21 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
             </button>
           </>
         ) : (
-          <button
-            className="btn btn-secondary"
-            style={{padding:'6px 18px'}}
-            title={`${selNendo}年度の計画書を${docType}にコピー`}
-            onClick={handleCopyFromPlan}>
-            計画書からコピー
-          </button>
+          <>
+            <button
+              className="btn btn-secondary"
+              style={{padding:'6px 18px'}}
+              title={`${selNendo}年度の計画書を${docType}にコピー`}
+              onClick={handleCopyFromPlan}>
+              計画書からコピー
+            </button>
+            <button
+              className="btn btn-secondary"
+              style={{padding:'6px 18px'}}
+              onClick={() => setBulkDeadlineModal(true)}>
+              提出期日を一括設定
+            </button>
+          </>
         ))}
         <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add', defaultNendo: String(selNendo)})}>＋ 追加</button>
       </div>
