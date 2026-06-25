@@ -1226,18 +1226,18 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
           <colgroup>
             <col style={{width:'40px'}} />
             <col style={{width:'160px'}} />
-            <col style={{width:'90px'}} />
             <col style={{width:'50px'}} />
             <col style={{width:'72px'}} />
             <col style={{width:'145px'}} />
             <col style={{width:'145px'}} />
             <col style={{width:'64px'}} />
             <col style={{width:'90px'}} />
+            <col style={{width:'90px'}} />
             <col style={{width:'80px'}} />
           </colgroup>
           <thead>
             <tr>
-              {['No.','顧問先名','ステータス','年度','区分','サービス種別','提出先','提出先URL','提出期日','操作'].map(h => (
+              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','ステータス','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
@@ -1252,12 +1252,17 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
               const gBg = cancelled ? '#e5e7eb' : undefined;
               const gStatus = (statusMap || {})[g.グループid] || '未着手';
               const gStatusColor = STATUS_COLORS[gStatus] || '#E53935';
+              /* メモ取得：allMasters（未フィルタ全件）→ masters（業種フィルタ済み）の順で検索 */
+              const masterPool = (allMasters && allMasters.length > 0) ? allMasters : (masters || []);
+              const gNum = String(g['顧問先ナンバー'] ?? '');
+              const masterRec = gNum ? masterPool.find(m => String(m['顧問先ナンバー'] ?? '') === gNum) : undefined;
+              const gMemo = masterRec ? (masterRec['メモ'] || '') : '';
               return g.items.map((it, idx) => {
                 const rBg = cancelled ? '#e5e7eb' : undefined;
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
-                    {/* No.・顧問先名・ステータス・年度（グループ結合） */}
+                    {/* No.・顧問先名・年度（グループ結合） */}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center', color:'#374151'}}>
                         {g['顧問先ナンバー'] ?? ''}
@@ -1266,27 +1271,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word', verticalAlign:'middle'}}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
-                        {(() => {
-                          const masterList = allMasters && allMasters.length > 0 ? allMasters : masters;
-                          const m = masterList.find(m => String(m['顧問先ナンバー']) === String(g['顧問先ナンバー']));
-                          return m?.['メモ'] ? <div style={{fontSize:'11px', color:'#999', marginTop:'2px', fontWeight:'400', lineHeight:'1.4'}}>{m['メモ']}</div> : null;
-                        })()}
-                      </td>
-                    )}
-                    {idx === 0 && (
-                      <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
-                        <span
-                          onClick={() => !cancelled && onStatusChange(g.グループid, nextStatus(gStatus))}
-                          style={{
-                            display:'inline-block',
-                            padding:'4px 10px', borderRadius:'12px',
-                            background: gStatusColor, color:'white', fontWeight:'700', fontSize:'13px',
-                            cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
-                            userSelect:'none',
-                          }}
-                        >
-                          {gStatus}
-                        </span>
+                        {gMemo && <div style={{fontSize:'11px', color:'#999', marginTop:'2px', fontWeight:'400', lineHeight:'1.4'}}>{gMemo}</div>}
                       </td>
                     )}
                     {idx === 0 && (
@@ -1311,7 +1296,23 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                       ) : ''}
                     </td>
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>{fmtDate(it['deadlineDate'])}</td>
-                    {/* 操作（グループ結合） */}
+                    {/* ステータス・操作（グループ結合） */}
+                    {idx === 0 && (
+                      <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
+                        <span
+                          onClick={() => !cancelled && onStatusChange(g.グループid, nextStatus(gStatus))}
+                          style={{
+                            display:'inline-block',
+                            padding:'4px 10px', borderRadius:'12px',
+                            background: gStatusColor, color:'white', fontWeight:'700', fontSize:'13px',
+                            cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
+                            userSelect:'none',
+                          }}
+                        >
+                          {gStatus}
+                        </span>
+                      </td>
+                    )}
                     {idx === 0 && (
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
@@ -1455,7 +1456,10 @@ function App() {
       listenersActive = true;
 
       refs.masters.on('value', (snap) => {
+        const raw = snap.val();
         const arr = snapToArray(snap);
+        console.log('[DEBUG masters] keys:', raw ? Object.keys(raw) : null);
+        console.log('[DEBUG masters] arr[0]:', arr?.[0]);
         if (arr === null) {
           refs.masters.set(INITIAL_MASTERS);
         } else {
