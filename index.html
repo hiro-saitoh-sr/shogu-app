@@ -51,8 +51,8 @@
     td { padding-top: 10px !important; padding-bottom: 10px !important; font-size: 19px !important; color: #000000 !important; font-weight: 500 !important; vertical-align: middle !important; }
     table { color: #000000; font-size: 19px; }
     tr:hover td { background: #ecfdf5; }
-    .delivery-table th { font-size: 13px !important; padding: 6px 8px !important; }
-    .delivery-table td { font-size: 13px !important; padding-top: 6px !important; padding-bottom: 6px !important; padding-left: 8px !important; padding-right: 8px !important; }
+    .delivery-table th { font-size: 15px !important; padding: 6px 8px !important; }
+    .delivery-table td { font-size: 15px !important; padding-top: 6px !important; padding-bottom: 6px !important; padding-left: 8px !important; padding-right: 8px !important; }
 
     /* ── レイアウト ── */
     .table-wrap { overflow-x: auto; overflow-y: auto; max-height: calc(100vh - 310px); }
@@ -137,7 +137,7 @@ function snapToArray(snap) {
 
 const MASTER_FIELDS   = ['id','顧問先ナンバー','顧問先名','業種','賃金改善実施期間','契約解除'];
 const CHINGIN_OPTIONS = ['４月～３月','５月～４月','６月～５月','７月～６月'];
-const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','顧問先ナンバー','年度','打ち合わせ日','提出担当','区分','提出先','サービス種別','提出先URL','取消','deadlineDate','deliveryDate','selfSubmit','submittedDate'];
+const DELIVERY_FIELDS = ['グループid','保険者id','顧問先名','顧問先ナンバー','年度','打ち合わせ日','提出担当','区分','提出先','サービス種別','提出先URL','取消','deadlineDate','deliveryDate','selfSubmit','submittedDate','status'];
 const NENDO_OPTIONS   = [2025, 2026, 2027];
 
 /* ══════════════════════════════════════════
@@ -603,6 +603,7 @@ function flatToGroups(rows) {
       deliveryDate:  r['deliveryDate']  ?? '',
       selfSubmit:    r['selfSubmit']    ?? false,
       submittedDate: r['submittedDate'] ?? '',
+      status:        r['status']        ?? '未着手',
     });
   });
   return order.map(gid => map.get(gid));
@@ -629,6 +630,7 @@ function groupsToFlat(groups) {
         deliveryDate:  item.deliveryDate  ?? '',
         selfSubmit:    item.selfSubmit    ?? false,
         submittedDate: item.submittedDate ?? '',
+        status:        item.status        ?? '未着手',
       });
     });
   });
@@ -950,6 +952,22 @@ function BulkDeadlineModal({ onExecute, onClose }) {
 }
 
 /* ══════════════════════════════════════════
+   ステータス定義
+══════════════════════════════════════════ */
+const STATUS_LIST = ['未着手', '依頼中', '収集済', '集計完了', '納品済'];
+const STATUS_COLORS = {
+  '未着手':  '#E53935',
+  '依頼中':  '#8E24AA',
+  '収集済':  '#039BE5',
+  '集計完了': '#43A047',
+  '納品済':  '#FB8C00',
+};
+function nextStatus(cur) {
+  const idx = STATUS_LIST.indexOf(cur || '未着手');
+  return STATUS_LIST[(idx + 1) % STATUS_LIST.length];
+}
+
+/* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
 function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows, rinjiShoguPlanRows, rinjiBaseupPlanRows }) {
@@ -1028,6 +1046,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         deliveryDate:  '',
         selfSubmit:    false,
         submittedDate: '',
+        status:        '未着手',
       })),
     }));
   }
@@ -1203,40 +1222,38 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'1000px'}}>
+        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'900px'}}>
           <colgroup>
-            <col style={{width:'36px'}} />
-            <col style={{width:'140px'}} />
-            <col style={{width:'44px'}} />
-            <col style={{width:'68px'}} />
-            <col style={{width:'110px'}} />
-            <col style={{width:'110px'}} />
-            <col style={{width:'58px'}} />
-            <col style={{width:'84px'}} />
-            <col style={{width:'100px'}} />
-            <col style={{width:'100px'}} />
+            <col style={{width:'40px'}} />
+            <col style={{width:'170px'}} />
+            <col style={{width:'50px'}} />
             <col style={{width:'72px'}} />
-            <col style={{width:'78px'}} />
+            <col style={{width:'140px'}} />
+            <col style={{width:'140px'}} />
+            <col style={{width:'64px'}} />
+            <col style={{width:'92px'}} />
+            <col style={{width:'88px'}} />
+            <col style={{width:'80px'}} />
           </colgroup>
           <thead>
             <tr>
-              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','打合せ','納品日','提出担当','操作'].map(h => (
+              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','ステータス','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={12} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={10} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
               const cancelled = g['取消'] === '1';
-              const allItemsHaveDelivery = g.items.every(it => !!it.deliveryDate);
-              const gBg = cancelled ? '#e5e7eb' : (allItemsHaveDelivery ? '#fefce8' : undefined);
+              const gBg = cancelled ? '#e5e7eb' : undefined;
               return g.items.map((it, idx) => {
-                const itemHasDelivery = !!it.deliveryDate;
-                const rBg = cancelled ? '#e5e7eb' : (itemHasDelivery ? '#fefce8' : undefined);
+                const rBg = cancelled ? '#e5e7eb' : undefined;
+                const status = it.status || '未着手';
+                const statusColor = STATUS_COLORS[status] || '#E53935';
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
@@ -1249,6 +1266,10 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word'}}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
+                        {(() => {
+                          const m = masters.find(m => String(m['顧問先ナンバー']) === String(g['顧問先ナンバー']));
+                          return m?.['メモ'] ? <div style={{fontSize:'11px', color:'#999', marginTop:'2px'}}>{m['メモ']}</div> : null;
+                        })()}
                       </td>
                     )}
                     {idx === 0 && (
@@ -1256,7 +1277,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                         {g['年度'] || ''}
                       </td>
                     )}
-                    {/* 提出先ごとのセル（区分〜提出期日） */}
+                    {/* 提出先ごとのセル（区分〜ステータス） */}
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
                       <span style={{...kubunBadgeStyle(it['区分']), padding:'2px 6px', borderRadius:'4px', fontWeight:'700', fontSize:'12px'}}>
                         {it['区分']}
@@ -1273,20 +1294,22 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                       ) : ''}
                     </td>
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>{fmtDate(it['deadlineDate'])}</td>
-                    {/* 打合せ（グループ結合） */}
-                    {idx === 0 && (
-                      <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center'}}>
-                        <InlineDateCell value={g['打ち合わせ日']} onChange={v => onGroupDateChange(g.グループid, '打ち合わせ日', v)} />
-                      </td>
-                    )}
-                    {/* 納品日（行ごと） */}
+                    {/* ステータス */}
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
-                      <InlineDateCell value={it.deliveryDate}
-                        onChange={v => onItemFieldChange(g.グループid, it.保険者id, { deliveryDate: v })} />
+                      <span
+                        onClick={() => !cancelled && onItemFieldChange(g.グループid, it.保険者id, { status: nextStatus(status) })}
+                        style={{
+                          display:'inline-block', padding:'3px 10px', borderRadius:'12px',
+                          background: statusColor, color:'white', fontWeight:'700', fontSize:'12px',
+                          cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
+                          userSelect:'none',
+                        }}
+                      >
+                        {status}
+                      </span>
                     </td>
-                    {/* 提出担当・操作（グループ結合） */}
-                    {idx === 0 && <>
-                      <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word'}}>{g['提出担当']}</td>
+                    {/* 操作（グループ結合） */}
+                    {idx === 0 && (
                       <td rowSpan={rs} style={merged(gBg)}>
                         {cancelled ? (
                           <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
@@ -1300,7 +1323,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                           </>
                         )}
                       </td>
-                    </>}
+                    )}
                   </tr>
                 );
               });
