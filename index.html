@@ -1272,7 +1272,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word', verticalAlign:'middle'}}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
-                        {gMemo && <div style={{fontSize:'11px', color:'#999', marginTop:'2px', fontWeight:'400', lineHeight:'1.4'}}>{gMemo}</div>}
+                        {gMemo && <div style={{fontSize:'11px', color:'#E65100', marginTop:'4px', fontWeight:'bold', lineHeight:'1.4', background:'#FFF3E0', padding:'2px 6px', borderRadius:'4px', display:'inline-block'}}>{gMemo}</div>}
                       </td>
                     )}
                     {idx === 0 && (
@@ -1315,17 +1315,26 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                       </td>
                     )}
                     {idx === 0 && (
-                      <td rowSpan={rs} style={merged(gBg)}>
+                      <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
                         {cancelled ? (
-                          <button className="btn btn-primary" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
-                            onClick={() => onRestore(g.グループid)}>復活</button>
+                          <button
+                            onClick={() => onRestore(g.グループid)}
+                            style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#dbeafe', color:'#2563eb', fontWeight:'500', border:'none', cursor:'pointer'}}>
+                            復活
+                          </button>
                         ) : (
-                          <>
-                            <button className="btn btn-secondary" style={{display:'block', padding:'3px 10px', fontSize:'13px', marginBottom:'6px'}}
-                              onClick={() => setModal({mode:'edit', group:g})}>編集</button>
-                            <button className="btn btn-danger" style={{display:'block', padding:'3px 10px', fontSize:'13px'}}
-                              onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}>取消</button>
-                          </>
+                          <div style={{display:'flex', gap:'4px', justifyContent:'center'}}>
+                            <button
+                              onClick={() => setModal({mode:'edit', group:g})}
+                              style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#eff6ff', color:'#2563eb', fontWeight:'500', border:'none', cursor:'pointer'}}>
+                              編集
+                            </button>
+                            <button
+                              onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}
+                              style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#fff7ed', color:'#ea580c', fontWeight:'500', border:'none', cursor:'pointer'}}>
+                              取消
+                            </button>
+                          </div>
                         )}
                       </td>
                     )}
