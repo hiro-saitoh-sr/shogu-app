@@ -1252,10 +1252,11 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
               const gBg = cancelled ? '#e5e7eb' : undefined;
               const gStatus = (statusMap || {})[g.グループid] || '未着手';
               const gStatusColor = STATUS_COLORS[gStatus] || '#E53935';
-              /* メモ取得：allMasters（未フィルタ全件）→ masters（業種フィルタ済み）の順で検索 */
+              /* メモ取得：顧問先名で一致するマスタを検索（ナンバー一致より確実） */
               const masterPool = (allMasters && allMasters.length > 0) ? allMasters : (masters || []);
-              const gNum = String(g['顧問先ナンバー'] ?? '');
-              const masterRec = gNum ? masterPool.find(m => String(m['顧問先ナンバー'] ?? '') === gNum) : undefined;
+              const masterRec = g.顧問先名
+                ? masterPool.find(m => m['顧問先名'] === g.顧問先名)
+                : masterPool.find(m => String(m['顧問先ナンバー'] ?? '') === String(g['顧問先ナンバー'] ?? ''));
               const gMemo = masterRec ? (masterRec['メモ'] || '') : '';
               return g.items.map((it, idx) => {
                 const rBg = cancelled ? '#e5e7eb' : undefined;
@@ -1303,8 +1304,8 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                           onClick={() => !cancelled && onStatusChange(g.グループid, nextStatus(gStatus))}
                           style={{
                             display:'inline-block',
-                            padding:'4px 10px', borderRadius:'12px',
-                            background: gStatusColor, color:'white', fontWeight:'700', fontSize:'13px',
+                            padding:'6px 16px', borderRadius:'6px',
+                            background: gStatusColor, color:'white', fontWeight:'700', fontSize:'14px',
                             cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
                             userSelect:'none',
                           }}
