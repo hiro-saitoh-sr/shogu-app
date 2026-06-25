@@ -77,6 +77,10 @@
     .btn-secondary { background: #f3f4f6; color: #000000; border: 1px solid #9ca3af; }
     .btn-secondary:hover { background: #e5e7eb; }
 
+    /* ── テーブル行ホバー時の操作ボタン ── */
+    .row-btns { opacity: 0; transition: opacity 0.2s; }
+    tr:hover .row-btns { opacity: 1; }
+
     /* ── Tailwind グレー文字クラスを上書き（コントラスト強化） ── */
     .text-gray-300 { color: #4b5563 !important; font-weight: 500; }
     .text-gray-400 { color: #374151 !important; font-weight: 500; }
@@ -1272,7 +1276,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word', verticalAlign:'middle'}}>
                         <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
-                        {gMemo && <div style={{fontSize:'11px', color:'#E65100', marginTop:'4px', fontWeight:'bold', lineHeight:'1.4', background:'#FFF3E0', padding:'2px 6px', borderRadius:'4px', display:'inline-block'}}>{gMemo}</div>}
+                        {gMemo && <div style={{fontSize:'11px', color:'#6A1B9A', marginTop:'4px', fontWeight:'bold', lineHeight:'1.4', background:'#EDE7F6', padding:'2px 6px', borderRadius:'4px', display:'inline-block'}}>{gMemo}</div>}
                       </td>
                     )}
                     {idx === 0 && (
@@ -1316,26 +1320,28 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                     )}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
-                        {cancelled ? (
-                          <button
-                            onClick={() => onRestore(g.グループid)}
-                            style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#dbeafe', color:'#2563eb', fontWeight:'500', border:'none', cursor:'pointer'}}>
-                            復活
-                          </button>
-                        ) : (
-                          <div style={{display:'flex', gap:'4px', justifyContent:'center'}}>
+                        <div className="row-btns" style={{display:'flex', gap:'4px', justifyContent:'center'}}>
+                          {cancelled ? (
                             <button
-                              onClick={() => setModal({mode:'edit', group:g})}
-                              style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#eff6ff', color:'#2563eb', fontWeight:'500', border:'none', cursor:'pointer'}}>
-                              編集
+                              onClick={() => onRestore(g.グループid)}
+                              style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#dbeafe', color:'#2563eb', fontWeight:'500', border:'none', cursor:'pointer'}}>
+                              復活
                             </button>
-                            <button
-                              onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}
-                              style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#fff7ed', color:'#ea580c', fontWeight:'500', border:'none', cursor:'pointer'}}>
-                              取消
-                            </button>
-                          </div>
-                        )}
+                          ) : (
+                            <>
+                              <button
+                                onClick={() => setModal({mode:'edit', group:g})}
+                                style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#eff6ff', color:'#2563eb', fontWeight:'500', border:'none', cursor:'pointer'}}>
+                                編集
+                              </button>
+                              <button
+                                onClick={() => { if (confirm('取消しますか？')) onDelete(g.グループid); }}
+                                style={{fontSize:'12px', padding:'4px 8px', borderRadius:'4px', background:'#fff7ed', color:'#ea580c', fontWeight:'500', border:'none', cursor:'pointer'}}>
+                                取消
+                              </button>
+                            </>
+                          )}
+                        </div>
                       </td>
                     )}
                   </tr>
