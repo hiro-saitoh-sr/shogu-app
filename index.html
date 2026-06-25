@@ -1222,28 +1222,29 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'860px'}}>
+        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'920px'}}>
           <colgroup>
             <col style={{width:'40px'}} />
-            <col style={{width:'200px'}} />
+            <col style={{width:'160px'}} />
+            <col style={{width:'90px'}} />
             <col style={{width:'50px'}} />
             <col style={{width:'72px'}} />
-            <col style={{width:'155px'}} />
-            <col style={{width:'155px'}} />
+            <col style={{width:'145px'}} />
+            <col style={{width:'145px'}} />
             <col style={{width:'64px'}} />
-            <col style={{width:'95px'}} />
-            <col style={{width:'85px'}} />
+            <col style={{width:'90px'}} />
+            <col style={{width:'80px'}} />
           </colgroup>
           <thead>
             <tr>
-              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','操作'].map(h => (
+              {['No.','顧問先名','ステータス','年度','区分','サービス種別','提出先','提出先URL','提出期日','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={9} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={10} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
@@ -1256,7 +1257,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
-                    {/* No.・顧問先名（ステータス含む）・年度（グループ結合） */}
+                    {/* No.・顧問先名・ステータス・年度（グループ結合） */}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center', color:'#374151'}}>
                         {g['顧問先ナンバー'] ?? ''}
@@ -1264,17 +1265,21 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                     )}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word', verticalAlign:'middle'}}>
-                        <span style={{fontWeight:'700', color:'#111827', display:'block'}}>{g.顧問先名}</span>
+                        <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
                         {(() => {
                           const masterList = allMasters && allMasters.length > 0 ? allMasters : masters;
                           const m = masterList.find(m => String(m['顧問先ナンバー']) === String(g['顧問先ナンバー']));
-                          return m?.['メモ'] ? <div style={{fontSize:'11px', color:'#999', marginTop:'2px', fontWeight:'400'}}>{m['メモ']}</div> : null;
+                          return m?.['メモ'] ? <div style={{fontSize:'11px', color:'#999', marginTop:'2px', fontWeight:'400', lineHeight:'1.4'}}>{m['メモ']}</div> : null;
                         })()}
+                      </td>
+                    )}
+                    {idx === 0 && (
+                      <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
                         <span
                           onClick={() => !cancelled && onStatusChange(g.グループid, nextStatus(gStatus))}
                           style={{
-                            display:'inline-block', marginTop:'5px',
-                            padding:'4px 12px', borderRadius:'12px',
+                            display:'inline-block',
+                            padding:'4px 10px', borderRadius:'12px',
                             background: gStatusColor, color:'white', fontWeight:'700', fontSize:'13px',
                             cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
                             userSelect:'none',
