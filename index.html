@@ -126,12 +126,12 @@ function saveAuthUser(user) {
   try { if (user) sessionStorage.setItem(AUTH_SK, JSON.stringify(user)); else sessionStorage.removeItem(AUTH_SK); } catch(e) {}
 }
 
-/* Firebase snapshot → array 変換（配列・整数キーオブジェクト両対応） */
+/* Firebase snapshot → array 変換（配列・整数キーオブジェクト両対応、非数値キーはスキップ） */
 function snapToArray(snap) {
   const val = snap.val();
   if (!val) return null;
   if (Array.isArray(val)) return val.filter(v => v != null);
-  const keys = Object.keys(val).sort((a, b) => Number(a) - Number(b));
+  const keys = Object.keys(val).filter(k => !isNaN(Number(k))).sort((a, b) => Number(a) - Number(b));
   return keys.map(k => val[k]).filter(v => v != null);
 }
 
@@ -970,7 +970,7 @@ function nextStatus(cur) {
 /* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
-function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, planRows, rinjiShoguPlanRows, rinjiBaseupPlanRows }) {
+function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, onStatusChange, planRows, rinjiShoguPlanRows, rinjiBaseupPlanRows }) {
   const [modal, setModal] = useState(null);
   const [copyModal, setCopyModal] = useState(null); // null | {title, confirmMsg, srcGroups, dstNendo}
   const [bulkDeadlineModal, setBulkDeadlineModal] = useState(false);
@@ -1222,54 +1222,66 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
         <span style={{fontSize:'14px', color:'#6b7280', marginLeft:'auto', whiteSpace:'nowrap'}}>全{groups.length}件 / 表示{displayed.length}件</span>
       </div>
       <div className="table-wrap">
-        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'900px'}}>
+        <table className="delivery-table" style={{width:'100%', borderCollapse:'collapse', tableLayout:'fixed', minWidth:'860px'}}>
           <colgroup>
             <col style={{width:'40px'}} />
-            <col style={{width:'170px'}} />
+            <col style={{width:'200px'}} />
             <col style={{width:'50px'}} />
             <col style={{width:'72px'}} />
-            <col style={{width:'140px'}} />
-            <col style={{width:'140px'}} />
+            <col style={{width:'155px'}} />
+            <col style={{width:'155px'}} />
             <col style={{width:'64px'}} />
-            <col style={{width:'92px'}} />
-            <col style={{width:'88px'}} />
-            <col style={{width:'80px'}} />
+            <col style={{width:'95px'}} />
+            <col style={{width:'85px'}} />
           </colgroup>
           <thead>
             <tr>
-              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','ステータス','操作'].map(h => (
+              {['No.','顧問先名','年度','区分','サービス種別','提出先','提出先URL','提出期日','操作'].map(h => (
                 <th key={h} style={thS}>{h}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {displayed.length === 0 && (
-              <tr><td colSpan={10} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
+              <tr><td colSpan={9} style={{textAlign:'center', padding:'32px', color:'#6b7280'}}>データがありません</td></tr>
             )}
             {displayed.map(g => {
               const rs = g.items.length;
               const cancelled = g['取消'] === '1';
               const gBg = cancelled ? '#e5e7eb' : undefined;
+              const gStatus = (statusMap || {})[g.グループid] || '未着手';
+              const gStatusColor = STATUS_COLORS[gStatus] || '#E53935';
               return g.items.map((it, idx) => {
                 const rBg = cancelled ? '#e5e7eb' : undefined;
-                const status = it.status || '未着手';
-                const statusColor = STATUS_COLORS[status] || '#E53935';
                 return (
                   <tr key={`${g.グループid}-${it.保険者id}`}
                     style={{borderBottom: idx === rs-1 ? '2px solid #d1d5db' : '1px solid #f3f4f6'}}>
-                    {/* 顧問先ナンバー・顧問先名・年度（結合） */}
+                    {/* No.・顧問先名（ステータス含む）・年度（グループ結合） */}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), ...nowrap, textAlign:'center', color:'#374151'}}>
                         {g['顧問先ナンバー'] ?? ''}
                       </td>
                     )}
                     {idx === 0 && (
-                      <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word'}}>
-                        <span style={{fontWeight:'700', color:'#111827'}}>{g.顧問先名}</span>
+                      <td rowSpan={rs} style={{...merged(gBg), overflowWrap:'break-word', verticalAlign:'middle'}}>
+                        <span style={{fontWeight:'700', color:'#111827', display:'block'}}>{g.顧問先名}</span>
                         {(() => {
-                          const m = masters.find(m => String(m['顧問先ナンバー']) === String(g['顧問先ナンバー']));
-                          return m?.['メモ'] ? <div style={{fontSize:'11px', color:'#999', marginTop:'2px'}}>{m['メモ']}</div> : null;
+                          const masterList = allMasters && allMasters.length > 0 ? allMasters : masters;
+                          const m = masterList.find(m => String(m['顧問先ナンバー']) === String(g['顧問先ナンバー']));
+                          return m?.['メモ'] ? <div style={{fontSize:'11px', color:'#999', marginTop:'2px', fontWeight:'400'}}>{m['メモ']}</div> : null;
                         })()}
+                        <span
+                          onClick={() => !cancelled && onStatusChange(g.グループid, nextStatus(gStatus))}
+                          style={{
+                            display:'inline-block', marginTop:'5px',
+                            padding:'4px 12px', borderRadius:'12px',
+                            background: gStatusColor, color:'white', fontWeight:'700', fontSize:'13px',
+                            cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
+                            userSelect:'none',
+                          }}
+                        >
+                          {gStatus}
+                        </span>
                       </td>
                     )}
                     {idx === 0 && (
@@ -1277,7 +1289,7 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                         {g['年度'] || ''}
                       </td>
                     )}
-                    {/* 提出先ごとのセル（区分〜ステータス） */}
+                    {/* 提出先ごとのセル（区分〜提出期日） */}
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
                       <span style={{...kubunBadgeStyle(it['区分']), padding:'2px 6px', borderRadius:'4px', fontWeight:'700', fontSize:'12px'}}>
                         {it['区分']}
@@ -1294,20 +1306,6 @@ function DeliveryView({ rows, masters, isRinji, isBaseup, docType, selNendo, set
                       ) : ''}
                     </td>
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>{fmtDate(it['deadlineDate'])}</td>
-                    {/* ステータス */}
-                    <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>
-                      <span
-                        onClick={() => !cancelled && onItemFieldChange(g.グループid, it.保険者id, { status: nextStatus(status) })}
-                        style={{
-                          display:'inline-block', padding:'3px 10px', borderRadius:'12px',
-                          background: statusColor, color:'white', fontWeight:'700', fontSize:'12px',
-                          cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
-                          userSelect:'none',
-                        }}
-                      >
-                        {status}
-                      </span>
-                    </td>
                     {/* 操作（グループ結合） */}
                     {idx === 0 && (
                       <td rowSpan={rs} style={merged(gBg)}>
@@ -1420,6 +1418,13 @@ function App() {
   const [baseupInterim, setBaseupInterim] = useState([]);
   const [baseupReport,  setBaseupReport]  = useState([]);
   const [syncStatus,    setSyncStatus]    = useState('loading'); // loading|connected|error
+  const [shoguPlanStatus,     setShoguPlanStatus]     = useState({});
+  const [shoguReportStatus,   setShoguReportStatus]   = useState({});
+  const [rinjiPlanStatus,     setRinjiPlanStatus]     = useState({});
+  const [rinjiReportStatus,   setRinjiReportStatus]   = useState({});
+  const [baseupPlanStatus,    setBaseupPlanStatus]    = useState({});
+  const [baseupInterimStatus, setBaseupInterimStatus] = useState({});
+  const [baseupReportStatus,  setBaseupReportStatus]  = useState({});
 
   /* ── Firebase リスナー設定（Firebase Auth 確認後に起動） ── */
   useEffect(() => {
@@ -1454,13 +1459,13 @@ function App() {
         }
       }, () => setSyncStatus('error'));
 
-      refs.shoguPlan.on('value',    (snap) => { setShoguPlan(snapToArray(snap)    || []); }, () => {});
-      refs.shoguReport.on('value',  (snap) => { setShoguReport(snapToArray(snap)  || []); }, () => {});
-      refs.rinjiPlan.on('value',    (snap) => { setRinjiPlan(snapToArray(snap)    || []); }, () => {});
-      refs.rinjiReport.on('value',  (snap) => { setRinjiReport(snapToArray(snap)  || []); }, () => {});
-      refs.baseupPlan.on('value',   (snap) => { setBaseupPlan(snapToArray(snap)   || []); }, () => {});
-      refs.baseupInterim.on('value',(snap) => { setBaseupInterim(snapToArray(snap)|| []); }, () => {});
-      refs.baseupReport.on('value', (snap) => { setBaseupReport(snapToArray(snap) || []); }, () => {});
+      refs.shoguPlan.on('value',    (snap) => { setShoguPlan(snapToArray(snap) || []);    setShoguPlanStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.shoguReport.on('value',  (snap) => { setShoguReport(snapToArray(snap) || []);  setShoguReportStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.rinjiPlan.on('value',    (snap) => { setRinjiPlan(snapToArray(snap) || []);    setRinjiPlanStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.rinjiReport.on('value',  (snap) => { setRinjiReport(snapToArray(snap) || []);  setRinjiReportStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.baseupPlan.on('value',   (snap) => { setBaseupPlan(snapToArray(snap) || []);   setBaseupPlanStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.baseupInterim.on('value',(snap) => { setBaseupInterim(snapToArray(snap) || []); setBaseupInterimStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.baseupReport.on('value', (snap) => { setBaseupReport(snapToArray(snap) || []);  setBaseupReportStatus((snap.val() || {}).status || {}); }, () => {});
     }
 
     // Firebase Auth の状態復元を待ってからリスナーを起動（ページリロード時の権限エラー防止）
@@ -1495,6 +1500,17 @@ function App() {
     return subTab === '計画書' ? rinjiPlan : rinjiReport;
   }, [mainTab, subTab, shoguPlan, shoguReport, rinjiPlan, rinjiReport, baseupPlan, baseupInterim, baseupReport]);
 
+  /* 現在タブのステータスマップ */
+  const currentStatusMap = useMemo(() => {
+    if (mainTab === '処遇改善加算') return subTab === '計画書' ? shoguPlanStatus : shoguReportStatus;
+    if (mainTab === 'ベースアップ評価料') {
+      if (subTab === '計画書') return baseupPlanStatus;
+      if (subTab === '中間報告') return baseupInterimStatus;
+      return baseupReportStatus;
+    }
+    return subTab === '計画書' ? rinjiPlanStatus : rinjiReportStatus;
+  }, [mainTab, subTab, shoguPlanStatus, shoguReportStatus, rinjiPlanStatus, rinjiReportStatus, baseupPlanStatus, baseupInterimStatus, baseupReportStatus]);
+
   /* タブごとに顧問先を業種でフィルタリング */
   const deliveryMasters = useMemo(() => {
     if (mainTab === 'ベースアップ評価料') {
@@ -1510,6 +1526,13 @@ function App() {
   }, [mainTab, masters]);
 
   /* ── データ変更ハンドラ（Firebase に書き込み → onValue が state を更新） ── */
+  /* statusノードを保持しながら行データを保存する共通ヘルパー */
+  function saveDeliveryRows(path, rows, statusData) {
+    const newData = {};
+    rows.forEach((row, idx) => { newData[String(idx)] = row; });
+    if (statusData && Object.keys(statusData).length > 0) newData['status'] = statusData;
+    return db.ref(`shogu/deliveries/${path}`).set(newData);
+  }
   function handleMastersSave(rows) {
     db.ref('shogu/masters').set(rows).catch(e => alert('保存エラー: ' + e.message));
   }
@@ -1520,19 +1543,19 @@ function App() {
     db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r)).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliverySave(rows) {
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
+    saveDeliveryRows(currentDeliveryPath, rows, currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryDelete(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: '1'} : r);
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
+    saveDeliveryRows(currentDeliveryPath, rows, currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryRestore(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: ''} : r);
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(rows).catch(e => alert('保存エラー: ' + e.message));
+    saveDeliveryRows(currentDeliveryPath, rows, currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryGroupDateChange(gid, field, value) {
     const updated = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, [field]: value} : r);
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(updated).catch(e => alert('保存エラー: ' + e.message));
+    saveDeliveryRows(currentDeliveryPath, updated, currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryItemFieldChange(gid, hokenshaId, fieldsObj) {
     const updated = currentRows.map(r => {
@@ -1541,7 +1564,11 @@ function App() {
       }
       return r;
     });
-    db.ref(`shogu/deliveries/${currentDeliveryPath}`).set(updated).catch(e => alert('保存エラー: ' + e.message));
+    saveDeliveryRows(currentDeliveryPath, updated, currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
+  }
+  function handleStatusChange(gid, newStatus) {
+    db.ref(`shogu/deliveries/${currentDeliveryPath}/status/${gid}`).set(newStatus)
+      .catch(e => alert('保存エラー: ' + e.message));
   }
 
   /* ── ログイン前 ── */
@@ -1658,6 +1685,8 @@ function App() {
             key={mainTab + '-' + subTab}
             rows={currentRows}
             masters={deliveryMasters}
+            allMasters={masters}
+            statusMap={currentStatusMap}
             isRinji={mainTab === '臨時の補助金'}
             isBaseup={mainTab === 'ベースアップ評価料'}
             docType={subTab}
@@ -1668,6 +1697,7 @@ function App() {
             onRestore={handleDeliveryRestore}
             onGroupDateChange={handleDeliveryGroupDateChange}
             onItemFieldChange={handleDeliveryItemFieldChange}
+            onStatusChange={handleStatusChange}
             planRows={mainTab === '処遇改善加算' ? shoguPlan : mainTab === 'ベースアップ評価料' ? baseupPlan : rinjiPlan}
             rinjiShoguPlanRows={mainTab === '臨時の補助金' ? shoguPlan : undefined}
             rinjiBaseupPlanRows={mainTab === '臨時の補助金' ? baseupPlan : undefined}
