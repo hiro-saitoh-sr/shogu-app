@@ -26,6 +26,7 @@
   <script src="https://unpkg.com/react@18/umd/react.development.js" crossorigin></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js" crossorigin></script>
   <script src="https://unpkg.com/@babel/standalone@7.23.10/babel.min.js"></script>
+  <script src="https://unpkg.com/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://accounts.google.com/gsi/client" async defer></script>
   <style>
@@ -972,6 +973,180 @@ function nextStatus(cur) {
 }
 
 /* ══════════════════════════════════════════
+   提出先データ Excel出力・インポート
+══════════════════════════════════════════ */
+const SUBMISSION_EXCEL_HEADERS = ['顧問先ナンバー', '顧問先名', '年度', '区分', 'サービス種別', '提出先（保険者）', '提出先URL', '提出期日'];
+/* Excel列名 → items内フィールド名 */
+const SUBMISSION_FIELD_MAP = [
+  ['区分', '区分'],
+  ['サービス種別', 'サービス種別'],
+  ['提出先（保険者）', '提出先'],
+  ['提出先URL', '提出先URL'],
+  ['提出期日', 'deadlineDate'],
+];
+function excelStr(v) {
+  if (v === null || v === undefined) return '';
+  return String(v).trim();
+}
+function todayYmd() {
+  const d = new Date();
+  return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+}
+
+/* 表示中グループ → Excel出力用フラット行 */
+function buildSubmissionExportRows(displayedGroups) {
+  const rows = [];
+  displayedGroups.forEach(g => {
+    g.items.forEach(it => {
+      rows.push({
+        '顧問先ナンバー':   g['顧問先ナンバー'] ?? '',
+        '顧問先名':         g['顧問先名'] ?? '',
+        '年度':             g['年度'] ?? '',
+        '区分':             it['区分'] ?? '',
+        'サービス種別':     it['サービス種別'] ?? '',
+        '提出先（保険者）': it['提出先'] ?? '',
+        '提出先URL':        it['提出先URL'] ?? '',
+        '提出期日':         it['deadlineDate'] ?? '',
+      });
+    });
+  });
+  return rows;
+}
+
+/* Excel読み込み結果（sheet_to_json） × 既存グループ（顧問先ナンバー＋年度＋行の並び順）を突合し、更新プランを作る */
+function buildSubmissionImportPlan(excelRows, groups) {
+  const orderedKeys = [];
+  const excelGroupsMap = new Map();
+  excelRows.forEach(r => {
+    const no    = excelStr(r['顧問先ナンバー']);
+    const nendo = excelStr(r['年度']);
+    if (!no && !nendo) return;
+    const key = `${no}::${nendo}`;
+    if (!excelGroupsMap.has(key)) {
+      excelGroupsMap.set(key, { 顧問先ナンバー: no, 年度: nendo, 顧問先名: excelStr(r['顧問先名']), rows: [] });
+      orderedKeys.push(key);
+    }
+    excelGroupsMap.get(key).rows.push(r);
+  });
+
+  const existingMap = new Map();
+  groups.forEach(g => {
+    const key = `${excelStr(g['顧問先ナンバー'])}::${excelStr(g['年度'])}`;
+    existingMap.set(key, g);
+  });
+
+  const resultGroups = [];
+  const unmatched = [];
+  let extraRowCount = 0;
+
+  orderedKeys.forEach(key => {
+    const eg = excelGroupsMap.get(key);
+    const existing = existingMap.get(key);
+    if (!existing) {
+      unmatched.push({ 顧問先ナンバー: eg.顧問先ナンバー, 年度: eg.年度, 顧問先名: eg.顧問先名 });
+      return;
+    }
+    if (eg.rows.length > existing.items.length) {
+      extraRowCount += eg.rows.length - existing.items.length;
+    }
+    const items = existing.items.map((it, idx) => {
+      const erow = eg.rows[idx];
+      if (!erow) return { idx, existingItem: it, newValues: {}, changes: [] };
+      const changes = [];
+      const newValues = {};
+      SUBMISSION_FIELD_MAP.forEach(([excelCol, field]) => {
+        const val = excelStr(erow[excelCol]);
+        if (val === '') return; // 空欄は既存データを上書きしない
+        const oldVal = excelStr(it[field]);
+        newValues[field] = val;
+        if (val !== oldVal) changes.push({ field, excelCol, oldVal, newVal: val });
+      });
+      return { idx, existingItem: it, newValues, changes };
+    });
+    resultGroups.push({
+      グループid:    existing.グループid,
+      顧問先ナンバー: existing['顧問先ナンバー'],
+      顧問先名:      existing['顧問先名'],
+      年度:          existing['年度'],
+      items,
+    });
+  });
+
+  const changedItemCount = resultGroups.reduce((sum, g) => sum + g.items.filter(it => it.changes.length > 0).length, 0);
+
+  return { resultGroups, unmatched, extraRowCount, changedItemCount, totalExcelRows: excelRows.length };
+}
+
+/* ── インポートプレビュー モーダル ── */
+function SubmissionImportPreviewModal({ plan, onExecute, onClose }) {
+  const th = {fontWeight:'700', fontSize:'13px', padding:'6px 8px', background:'#f9fafb', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827', textAlign:'left'};
+  const td = {fontSize:'13px', padding:'6px 8px', borderBottom:'1px solid #f3f4f6', verticalAlign:'top'};
+  const tdChanged = {...td, background:'#fef9c3'};
+
+  function fieldCell(it, field) {
+    const c = it.changes.find(c => c.field === field);
+    if (c) return <td style={tdChanged}>{c.oldVal || '(空欄)'} → <b>{c.newVal}</b></td>;
+    return <td style={td}>{excelStr(it.existingItem[field])}</td>;
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-box" style={{width:'1100px'}} onClick={e => e.stopPropagation()}>
+        <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'12px', color:'#111827'}}>提出先データ インポート プレビュー</h2>
+        <div style={{marginBottom:'14px', fontSize:'15px', color:'#374151'}}>
+          <div>対象顧問先：{plan.resultGroups.length}件 ／ 更新される行：<b>{plan.changedItemCount}件</b></div>
+          {plan.unmatched.length > 0 && (
+            <div style={{color:'#dc2626', marginTop:'4px'}}>
+              マッチする届出データが見つからなかった行：{plan.unmatched.length}件
+              （{plan.unmatched.map(u => u.顧問先名 || u.顧問先ナンバー).join('、')}）
+            </div>
+          )}
+          {plan.extraRowCount > 0 && (
+            <div style={{color:'#dc2626', marginTop:'4px'}}>
+              既存の提出先行数より多いため無視される行：{plan.extraRowCount}件
+            </div>
+          )}
+        </div>
+        <div style={{overflow:'auto', maxHeight:'50vh', border:'1px solid #e5e7eb', borderRadius:'6px'}}>
+          <table style={{width:'100%', borderCollapse:'collapse'}}>
+            <thead>
+              <tr>
+                {['顧問先ナンバー','顧問先名','年度','区分','サービス種別','提出先（保険者）','提出先URL','提出期日'].map(h => (
+                  <th key={h} style={th}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {plan.resultGroups.length === 0 && (
+                <tr><td colSpan={8} style={{...td, textAlign:'center', padding:'20px', color:'#6b7280'}}>マッチするデータがありません</td></tr>
+              )}
+              {plan.resultGroups.flatMap(g => g.items.map((it, idx) => (
+                <tr key={`${g.グループid}-${idx}`}>
+                  <td style={td}>{g.顧問先ナンバー}</td>
+                  <td style={td}>{g.顧問先名}</td>
+                  <td style={td}>{g.年度}</td>
+                  {fieldCell(it, '区分')}
+                  {fieldCell(it, 'サービス種別')}
+                  {fieldCell(it, '提出先')}
+                  {fieldCell(it, '提出先URL')}
+                  {fieldCell(it, 'deadlineDate')}
+                </tr>
+              )))}
+            </tbody>
+          </table>
+        </div>
+        <div style={{display:'flex', gap:'12px', justifyContent:'flex-end', marginTop:'20px'}}>
+          <button className="btn btn-secondary" onClick={onClose}>キャンセル</button>
+          <button className="btn btn-primary" disabled={plan.changedItemCount === 0} onClick={() => onExecute(plan)}>
+            インポート実行（{plan.changedItemCount}件更新）
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ══════════════════════════════════════════
    届出管理 テーブル
 ══════════════════════════════════════════ */
 function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup, docType, selNendo, setSelNendo, onSave, onDelete, onRestore, onGroupDateChange, onItemFieldChange, onStatusChange, planRows, rinjiShoguPlanRows, rinjiBaseupPlanRows }) {
@@ -982,6 +1157,8 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
   const [filterNendo, setFilterNendo] = useState('');
   const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
   const [showCancelled, setShowCancelled] = useState(false);
+  const [importPreview, setImportPreview] = useState(null); // null | プラン
+  const importFileRef = useRef(null);
 
   const dateLabel = '納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
@@ -1111,6 +1288,66 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
     alert(`${count}件更新しました`);
   }
 
+  /* ── 提出先データ Excel出力 ── */
+  function handleExportExcel() {
+    if (typeof XLSX === 'undefined') { alert('Excel出力ライブラリの読み込みに失敗しました。ページを再読み込みしてください。'); return; }
+    const exportRows = buildSubmissionExportRows(displayed);
+    if (exportRows.length === 0) { alert('出力する届出データがありません'); return; }
+    const ws = XLSX.utils.json_to_sheet(exportRows, { header: SUBMISSION_EXCEL_HEADERS });
+    ws['!cols'] = [{wch:12},{wch:26},{wch:8},{wch:12},{wch:18},{wch:20},{wch:34},{wch:12}];
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, '提出先データ');
+    XLSX.writeFile(wb, `提出先データ_${selNendo}_${docType}_${todayYmd()}.xlsx`);
+  }
+
+  /* ── 提出先データ Excelインポート ── */
+  function handleImportButtonClick() {
+    if (importFileRef.current) importFileRef.current.click();
+  }
+
+  function handleImportFileChange(e) {
+    const file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (typeof XLSX === 'undefined') { alert('Excel読み込みライブラリの読み込みに失敗しました。ページを再読み込みしてください。'); return; }
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const wb = XLSX.read(data, { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        const json = XLSX.utils.sheet_to_json(sheet, { defval: '' });
+        const plan = buildSubmissionImportPlan(json, groups);
+        if (plan.resultGroups.length === 0 && plan.unmatched.length === 0) {
+          alert('Excelファイルに読み込めるデータがありませんでした');
+          return;
+        }
+        setImportPreview(plan);
+      } catch (err) {
+        alert('Excelファイルの読み込みに失敗しました: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  }
+
+  function executeImport(plan) {
+    const updatedGroups = groups.map(g => {
+      const planGroup = plan.resultGroups.find(pg => pg.グループid === g.グループid);
+      if (!planGroup) return g;
+      return {
+        ...g,
+        items: g.items.map((it, idx) => {
+          const planItem = planGroup.items[idx];
+          if (!planItem || planItem.changes.length === 0) return it;
+          return { ...it, ...planItem.newValues };
+        }),
+      };
+    });
+    onSave(groupsToFlat(updatedGroups));
+    setImportPreview(null);
+    alert(`${plan.changedItemCount}件更新しました`);
+  }
+
   function handleCopyFromOtherPlan(srcRows, srcLabel) {
     const nendo = String(selNendo);
     const srcGroups = flatToGroups((srcRows || []).filter(r => String(r['年度']) === nendo && r['取消'] !== '1'));
@@ -1198,6 +1435,27 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
             </button>
           </>
         ))}
+        <button
+          className="btn btn-secondary"
+          style={{padding:'6px 18px'}}
+          title={`${selNendo}年度・${docType}の提出先データをExcel出力`}
+          onClick={handleExportExcel}>
+          📥 提出先データ出力
+        </button>
+        <button
+          className="btn btn-secondary"
+          style={{padding:'6px 18px'}}
+          title="提出先データをExcelから一括インポート"
+          onClick={handleImportButtonClick}>
+          📤 提出先データインポート
+        </button>
+        <input
+          ref={importFileRef}
+          type="file"
+          accept=".xlsx,.xls"
+          style={{display:'none'}}
+          onChange={handleImportFileChange}
+        />
         <button className="btn btn-primary" style={{padding:'6px 18px'}} onClick={() => setModal({mode:'add', defaultNendo: String(selNendo)})}>＋ 追加</button>
       </div>
       {/* ── フィルターバー ── */}
@@ -1377,6 +1635,13 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
         <BulkDeadlineModal
           onExecute={handleBulkDeadline}
           onClose={() => setBulkDeadlineModal(false)}
+        />
+      )}
+      {importPreview && (
+        <SubmissionImportPreviewModal
+          plan={importPreview}
+          onExecute={executeImport}
+          onClose={() => setImportPreview(null)}
         />
       )}
     </div>
