@@ -1,0 +1,6 @@
+# 端末固有・ローカル専用のClaude設定
+.claude/settings.local.json
+.claude/*.local.json
+
+# Node.js dependencies
+node_modules/
