@@ -1473,7 +1473,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
           {filterNameOptions.map(m => <option key={m.顧問先名} value={m.顧問先名}>{m.顧問先名}</option>)}
         </select>
         <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
-          style={{width:'150px', padding:'6px 10px', fontSize:'16px'}}>
+          style={{width:'190px', padding:'6px 10px', fontSize:'16px'}}>
           <option value="">ステータス（すべて）</option>
           {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
