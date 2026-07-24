@@ -1154,13 +1154,11 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
   const [copyModal, setCopyModal] = useState(null); // null | {title, confirmMsg, srcGroups, dstNendo}
   const [bulkDeadlineModal, setBulkDeadlineModal] = useState(false);
   const [filterName, setFilterName] = useState('');
-  const [filterNendo, setFilterNendo] = useState('');
-  const [filterNohon, setFilterNohon] = useState(''); // ''|'入力済み'|'未入力'
+  const [filterStatus, setFilterStatus] = useState('');
   const [showCancelled, setShowCancelled] = useState(false);
   const [importPreview, setImportPreview] = useState(null); // null | プラン
   const importFileRef = useRef(null);
 
-  const dateLabel = '納品日';
   const groups = useMemo(() => flatToGroups(rows), [rows]);
 
   /* 絞り込み用：登録済みレコードの顧問先を重複排除・顧問先ナンバー順に並べる */
@@ -1192,17 +1190,15 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
       });
     }
     result = result.filter(g => showCancelled ? g['取消'] === '1' : g['取消'] !== '1');
-    if (filterNendo) result = result.filter(g => g['年度'] === filterNendo);
-    if (filterName)  result = result.filter(g => g.顧問先名 === filterName);
-    if (filterNohon === '入力済み') result = result.filter(g => g.items.every(it => !!it.deliveryDate));
-    if (filterNohon === '未入力')   result = result.filter(g => g.items.some(it => !it.deliveryDate));
+    if (filterName)   result = result.filter(g => g.顧問先名 === filterName);
+    if (filterStatus) result = result.filter(g => ((statusMap || {})[g.グループid] || '未着手') === filterStatus);
     result = [...result].sort((a, b) => {
       const na = (a['顧問先ナンバー'] !== '' && a['顧問先ナンバー'] != null) ? Number(a['顧問先ナンバー']) : Infinity;
       const nb = (b['顧問先ナンバー'] !== '' && b['顧問先ナンバー'] != null) ? Number(b['顧問先ナンバー']) : Infinity;
       return na - nb;
     });
     return result;
-  }, [groups, selNendo, showCancelled, filterNendo, filterName, filterNohon]);
+  }, [groups, selNendo, showCancelled, filterName, filterStatus, statusMap]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -1386,22 +1382,32 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
             style={{padding:'7px 14px', background:'none', border:'none', borderLeft:'1px solid #e5e7eb', cursor:'pointer', fontWeight:'700', color:'#6b7280', fontSize:'18px', fontFamily:'inherit', lineHeight:1}}>→</button>
         </div>
         {isRinji ? (
-          <>
+          docType === '実績報告' ? (
             <button
               className="btn btn-secondary"
               style={{padding:'6px 18px'}}
-              title={`${selNendo}年度の処遇改善加算計画書からコピー`}
-              onClick={() => handleCopyFromOtherPlan(rinjiShoguPlanRows, '処遇改善加算')}>
-              処遇改善加算からコピー
+              title={`${selNendo}年度の計画書を${docType}にコピー`}
+              onClick={handleCopyFromPlan}>
+              計画書からコピー
             </button>
-            <button
-              className="btn btn-secondary"
-              style={{padding:'6px 18px'}}
-              title={`${selNendo}年度のベースアップ評価料計画書からコピー`}
-              onClick={() => handleCopyFromOtherPlan(rinjiBaseupPlanRows, 'ベースアップ評価料')}>
-              ベースアップ評価料からコピー
-            </button>
-          </>
+          ) : (
+            <>
+              <button
+                className="btn btn-secondary"
+                style={{padding:'6px 18px'}}
+                title={`${selNendo}年度の処遇改善加算計画書からコピー`}
+                onClick={() => handleCopyFromOtherPlan(rinjiShoguPlanRows, '処遇改善加算')}>
+                処遇改善加算からコピー
+              </button>
+              <button
+                className="btn btn-secondary"
+                style={{padding:'6px 18px'}}
+                title={`${selNendo}年度のベースアップ評価料計画書からコピー`}
+                onClick={() => handleCopyFromOtherPlan(rinjiBaseupPlanRows, 'ベースアップ評価料')}>
+                ベースアップ評価料からコピー
+              </button>
+            </>
+          )
         ) : (docType === '計画書' ? (
           <>
             <button
@@ -1466,16 +1472,10 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
           <option value="">顧問先名（すべて）</option>
           {filterNameOptions.map(m => <option key={m.顧問先名} value={m.顧問先名}>{m.顧問先名}</option>)}
         </select>
-        <select value={filterNendo} onChange={e => setFilterNendo(e.target.value)}
+        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)}
           style={{width:'150px', padding:'6px 10px', fontSize:'16px'}}>
-          <option value="">年度（すべて）</option>
-          {NENDO_OPTIONS.map(y => <option key={y} value={String(y)}>{y}</option>)}
-        </select>
-        <select value={filterNohon} onChange={e => setFilterNohon(e.target.value)}
-          style={{width:'210px', padding:'6px 10px', fontSize:'16px'}}>
-          <option value="">{dateLabel}（すべて）</option>
-          <option value="入力済み">入力済み</option>
-          <option value="未入力">未入力</option>
+          <option value="">ステータス（すべて）</option>
+          {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
         </select>
         <label style={{display:'flex', alignItems:'center', gap:'8px', fontWeight:'600', cursor:'pointer', fontSize:'16px'}}>
           <input type="checkbox" checked={showCancelled} onChange={e => setShowCancelled(e.target.checked)} style={{width:'17px', height:'17px'}} />
