@@ -649,6 +649,11 @@ function isRowComplete(g, it) {
   return itemOk && sharedOk;
 }
 
+/* 区分（行）ごとのステータス表示要否：リンクURLまたは提出期日があるときのみ表示 */
+function itemHasStatus(it) {
+  return !!(it['提出先URL'] || it['deadlineDate']);
+}
+
 /* ── グループ編集モーダル ── */
 function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBaseup, docType, onSave, onClose }) {
   const dateLabel = '納品日';
@@ -959,13 +964,14 @@ function BulkDeadlineModal({ onExecute, onClose }) {
 /* ══════════════════════════════════════════
    ステータス定義
 ══════════════════════════════════════════ */
-const STATUS_LIST = ['未着手', '依頼中', '収集済', '集計完了', '納品済'];
+const STATUS_LIST = ['未着手', '依頼中', '収集済', '集計完了', '納品済', '自社作成'];
 const STATUS_COLORS = {
   '未着手':  '#E53935',
   '依頼中':  '#8E24AA',
   '収集済':  '#039BE5',
   '集計完了': '#43A047',
   '納品済':  '#FB8C00',
+  '自社作成': '#757575',
 };
 function nextStatus(cur) {
   const idx = STATUS_LIST.indexOf(cur || '未着手');
@@ -1191,14 +1197,18 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
     }
     result = result.filter(g => showCancelled ? g['取消'] === '1' : g['取消'] !== '1');
     if (filterName)   result = result.filter(g => g.顧問先名 === filterName);
-    if (filterStatus) result = result.filter(g => ((statusMap || {})[g.グループid] || '未着手') === filterStatus);
+    if (filterStatus) {
+      result = isRinji
+        ? result.filter(g => g.items.some(it => itemHasStatus(it) && (it.status || '未着手') === filterStatus))
+        : result.filter(g => ((statusMap || {})[g.グループid] || '未着手') === filterStatus);
+    }
     result = [...result].sort((a, b) => {
       const na = (a['顧問先ナンバー'] !== '' && a['顧問先ナンバー'] != null) ? Number(a['顧問先ナンバー']) : Infinity;
       const nb = (b['顧問先ナンバー'] !== '' && b['顧問先ナンバー'] != null) ? Number(b['顧問先ナンバー']) : Infinity;
       return na - nb;
     });
     return result;
-  }, [groups, selNendo, showCancelled, filterName, filterStatus, statusMap]);
+  }, [groups, selNendo, showCancelled, filterName, filterStatus, statusMap, isRinji]);
 
   function handleGroupSave(group) {
     const others = groups.filter(g => g.グループid !== group.グループid);
@@ -1559,8 +1569,30 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                       ) : ''}
                     </td>
                     <td style={{...cell(rBg), ...nowrap, textAlign:'center'}}>{fmtDate(it['deadlineDate'])}</td>
-                    {/* ステータス・操作（グループ結合） */}
-                    {idx === 0 && (
+                    {/* ステータス：臨時の補助金は区分（行）ごと、それ以外はグループ結合 */}
+                    {isRinji ? (() => {
+                      const showStatus = itemHasStatus(it);
+                      const iStatus = it.status || '未着手';
+                      const iStatusColor = STATUS_COLORS[iStatus] || '#E53935';
+                      return (
+                        <td style={{...cell(rBg), textAlign:'center', verticalAlign:'middle'}}>
+                          {showStatus && (
+                            <span
+                              onClick={() => !cancelled && onItemFieldChange(g.グループid, it.保険者id, {status: nextStatus(iStatus)})}
+                              style={{
+                                display:'inline-block',
+                                padding:'6px 16px', borderRadius:'6px',
+                                background: iStatusColor, color:'white', fontWeight:'700', fontSize:'14px',
+                                cursor: cancelled ? 'default' : 'pointer', whiteSpace:'nowrap',
+                                userSelect:'none',
+                              }}
+                            >
+                              {iStatus}
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })() : (idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
                         <span
                           onClick={() => !cancelled && onStatusChange(g.グループid, nextStatus(gStatus))}
@@ -1575,7 +1607,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
                           {gStatus}
                         </span>
                       </td>
-                    )}
+                    ))}
                     {idx === 0 && (
                       <td rowSpan={rs} style={{...merged(gBg), textAlign:'center', verticalAlign:'middle'}}>
                         <div className="row-btns" style={{display:'flex', gap:'4px', justifyContent:'center'}}>
