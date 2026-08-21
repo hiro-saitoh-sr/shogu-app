@@ -1711,6 +1711,45 @@ const INITIAL_MASTERS = [
 ];
 
 /* ══════════════════════════════════════════
+   臨時の補助金：年度ごとの補助金名称（クリックで編集）
+══════════════════════════════════════════ */
+function RinjiSubsidyNameEditor({ nendo, value, onSave }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(value || '');
+
+  useEffect(() => { setText(value || ''); }, [value, nendo]);
+
+  function commit() {
+    setEditing(false);
+    const trimmed = text.trim();
+    if (trimmed !== (value || '')) onSave(trimmed);
+  }
+
+  if (editing) {
+    return (
+      <input
+        autoFocus
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); }}
+        placeholder="補助金名称を入力..."
+        style={{padding:'5px 10px', fontSize:'15px', fontWeight:'600', border:'1px solid #7c3aed', borderRadius:'4px', minWidth:'280px'}}
+      />
+    );
+  }
+  return (
+    <span
+      onClick={() => setEditing(true)}
+      title="クリックして編集"
+      style={{cursor:'pointer', display:'flex', alignItems:'center', gap:'6px', fontSize:'15px', fontWeight:'700',
+        color: value ? '#374151' : '#9ca3af'}}>
+      {nendo}年度　{value || '補助金名称を入力...'} ✏️
+    </span>
+  );
+}
+
+/* ══════════════════════════════════════════
    メインアプリ
 ══════════════════════════════════════════ */
 function App() {
@@ -1744,6 +1783,7 @@ function App() {
   const [baseupPlanStatus,    setBaseupPlanStatus]    = useState({});
   const [baseupInterimStatus, setBaseupInterimStatus] = useState({});
   const [baseupReportStatus,  setBaseupReportStatus]  = useState({});
+  const [rinjiSubsidyNames,   setRinjiSubsidyNames]   = useState({});
 
   /* ── Firebase リスナー設定（Firebase Auth 確認後に起動） ── */
   useEffect(() => {
@@ -1760,6 +1800,7 @@ function App() {
       baseupPlan:   db.ref('shogu/deliveries/baseupPlan'),
       baseupInterim: db.ref('shogu/deliveries/baseupInterim'),
       baseupReport: db.ref('shogu/deliveries/baseupReport'),
+      rinjiSubsidyNames: db.ref('shogu/rinjiSubsidyNames'),
     };
 
     let listenersActive = false;
@@ -1788,6 +1829,7 @@ function App() {
       refs.baseupPlan.on('value',   (snap) => { setBaseupPlan(snapToArray(snap) || []);   setBaseupPlanStatus((snap.val() || {}).status || {}); }, () => {});
       refs.baseupInterim.on('value',(snap) => { setBaseupInterim(snapToArray(snap) || []); setBaseupInterimStatus((snap.val() || {}).status || {}); }, () => {});
       refs.baseupReport.on('value', (snap) => { setBaseupReport(snapToArray(snap) || []);  setBaseupReportStatus((snap.val() || {}).status || {}); }, () => {});
+      refs.rinjiSubsidyNames.on('value', (snap) => { setRinjiSubsidyNames(snap.val() || {}); }, () => {});
     }
 
     // Firebase Auth の状態復元を待ってからリスナーを起動（ページリロード時の権限エラー防止）
@@ -1892,6 +1934,9 @@ function App() {
     db.ref(`shogu/deliveries/${currentDeliveryPath}/status/${gid}`).set(newStatus)
       .catch(e => alert('保存エラー: ' + e.message));
   }
+  function handleRinjiSubsidyNameSave(nendo, name) {
+    db.ref(`shogu/rinjiSubsidyNames/${nendo}`).set(name).catch(e => alert('保存エラー: ' + e.message));
+  }
 
   /* ── ログイン前 ── */
   if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
@@ -1979,22 +2024,31 @@ function App() {
 
       {/* ── サブタブ（計画書 / [中間報告] / 実績報告） ── */}
       {view === 'delivery' && (
-        <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', gap:'4px'}}>
-          {(mainTab === 'ベースアップ評価料' ? ['計画書','中間報告','実績報告'] : ['計画書','実績報告']).map(tab => {
-            const ts = ({計画書:{bg:'#2563eb',bd:'#1d4ed8'}, 中間報告:{bg:'#d97706',bd:'#b45309'}, 実績報告:{bg:'#16a34a',bd:'#15803d'}})[tab] || {bg:'#16a34a',bd:'#15803d'};
-            return (
-              <button key={tab} className="tab-btn"
-                style={{padding:'8px 20px', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer',
-                  background:   subTab===tab ? ts.bg : 'transparent',
-                  borderBottom: subTab===tab ? `2px solid ${ts.bd}` : '2px solid transparent',
-                  color:        subTab===tab ? 'white' : '#374151',
-                  fontWeight:   subTab===tab ? '700' : '500',
-                }}
-                onClick={() => setSubTab(tab)}>
-                {tab}
-              </button>
-            );
-          })}
+        <div style={{background:'#f9fafb', borderBottom:'1px solid #e5e7eb', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', gap:'10px'}}>
+          <div style={{display:'flex', gap:'4px'}}>
+            {(mainTab === 'ベースアップ評価料' ? ['計画書','中間報告','実績報告'] : ['計画書','実績報告']).map(tab => {
+              const ts = ({計画書:{bg:'#2563eb',bd:'#1d4ed8'}, 中間報告:{bg:'#d97706',bd:'#b45309'}, 実績報告:{bg:'#16a34a',bd:'#15803d'}})[tab] || {bg:'#16a34a',bd:'#15803d'};
+              return (
+                <button key={tab} className="tab-btn"
+                  style={{padding:'8px 20px', border:'none', borderRadius:'6px 6px 0 0', cursor:'pointer',
+                    background:   subTab===tab ? ts.bg : 'transparent',
+                    borderBottom: subTab===tab ? `2px solid ${ts.bd}` : '2px solid transparent',
+                    color:        subTab===tab ? 'white' : '#374151',
+                    fontWeight:   subTab===tab ? '700' : '500',
+                  }}
+                  onClick={() => setSubTab(tab)}>
+                  {tab}
+                </button>
+              );
+            })}
+          </div>
+          {mainTab === '臨時の補助金' && (
+            <RinjiSubsidyNameEditor
+              nendo={selNendo}
+              value={rinjiSubsidyNames[String(selNendo)] || ''}
+              onSave={(name) => handleRinjiSubsidyNameSave(selNendo, name)}
+            />
+          )}
         </div>
       )}
 
