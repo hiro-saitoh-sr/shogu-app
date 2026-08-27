@@ -666,7 +666,7 @@ function itemHasStatus(it) {
 }
 
 /* ── グループ編集モーダル ── */
-function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBaseup, docType, onSave, onClose }) {
+function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBaseup, docType, statusMap, onSave, onClose }) {
   const dateLabel = '納品日';
   const emptyItem = () => ({ 保険者id: Date.now(), 区分: isBaseup ? '医療' : '介護保険', 提出先:'', サービス種別:'', 提出先URL:'', deadlineDate:'' });
 
@@ -684,6 +684,7 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
     提出担当:      initGroup.提出担当,
   });
   const [items, setItems] = useState(initGroup.items.length > 0 ? initGroup.items : [emptyItem()]);
+  const [status, setStatus] = useState(initial ? ((statusMap || {})[initial.グループid] || '対象あり') : '対象あり');
 
   const setS = (k, v) => setShared(f => ({...f, [k]: v}));
   const setItem = (idx, k, v) => setItems(its => its.map((it, i) => i === idx ? {...it, [k]: v} : it));
@@ -695,7 +696,7 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
     const allGids = allRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0)).filter(n => !isNaN(n));
     const gid = initial ? initial.グループid : (allGids.length > 0 ? Math.max(...allGids) + 1 : 1);
     const numberedItems = items.map((it, i) => ({...it, 保険者id: it.保険者id || i + 1, ...(isBaseup ? {区分:'医療'} : {})}));
-    onSave({ ...shared, グループid: gid, items: numberedItems });
+    onSave({ ...shared, グループid: gid, items: numberedItems }, isRinji ? undefined : status);
   }
 
   const thStyle = {fontWeight:'700', fontSize:'14px', padding:'6px 8px', background:'#f9fafb', borderBottom:'1px solid #e5e7eb', whiteSpace:'nowrap', color:'#111827'};
@@ -736,6 +737,16 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
             </select>
           </div>
         </div>
+
+        {/* ステータス（臨時の補助金は区分ごとにステータスがあるため対象外） */}
+        {!isRinji && (
+          <div style={{marginBottom:'20px'}}>
+            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>ステータス</label>
+            <select value={status} onChange={e => setStatus(e.target.value)}>
+              {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+        )}
 
         {/* 提出先リスト */}
         <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
@@ -1216,10 +1227,14 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
     return result;
   }, [groups, selNendo, showCancelled, filterName, filterStatus, statusMap, isRinji]);
 
-  function handleGroupSave(group) {
+  function handleGroupSave(group, newStatus) {
     const others = groups.filter(g => g.グループid !== group.グループid);
     const newGroups = modal.mode === 'add' ? [...groups, group] : [...others, group].sort((a,b) => a.グループid - b.グループid);
-    onSave(groupsToFlat(newGroups));
+    if (newStatus !== undefined) {
+      onSave(groupsToFlat(newGroups), {...(statusMap || {}), [group.グループid]: newStatus});
+    } else {
+      onSave(groupsToFlat(newGroups));
+    }
     setModal(null);
   }
 
@@ -1656,6 +1671,7 @@ function DeliveryView({ rows, masters, allMasters, statusMap, isRinji, isBaseup,
           isRinji={isRinji}
           isBaseup={isBaseup}
           docType={docType}
+          statusMap={statusMap}
           onSave={handleGroupSave}
           onClose={() => setModal(null)}
         />
@@ -1912,8 +1928,8 @@ function App() {
   function handleMasterRestore(id) {
     db.ref('shogu/masters').set(masters.map(r => r.id === id ? {...r, 契約解除: ''} : r)).catch(e => alert('保存エラー: ' + e.message));
   }
-  function handleDeliverySave(rows) {
-    saveDeliveryRows(currentDeliveryPath, rows, currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
+  function handleDeliverySave(rows, statusData) {
+    saveDeliveryRows(currentDeliveryPath, rows, statusData !== undefined ? statusData : currentStatusMap).catch(e => alert('保存エラー: ' + e.message));
   }
   function handleDeliveryDelete(gid) {
     const rows = currentRows.map(r => Number(r['グループid'] ?? r['id'] ?? 0) === gid ? {...r, 取消: '1'} : r);
