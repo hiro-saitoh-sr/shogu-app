@@ -263,7 +263,7 @@ function MasterModal({ initial, onSave, onClose }) {
   const g12 = {display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px'};
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-box" style={{width:'760px', padding:'24px'}} onClick={e => e.stopPropagation()}>
         <h2 style={{fontSize:'19px', fontWeight:'800', marginBottom:'16px'}}>
           {initial ? '顧問先を編集' : '顧問先を追加'}
@@ -380,7 +380,7 @@ function MasterDetailModal({ row, onClose, onEdit }) {
   const gyoshuList = parseGyoshu(row['業種']);
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-box" style={{width:'600px'}} onClick={e => e.stopPropagation()}>
         <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:'20px'}}>
           <h2 style={{fontSize:'20px', fontWeight:'800'}}>顧問先詳細</h2>
@@ -703,7 +703,7 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
   const tdStyle = {padding:'6px 8px', verticalAlign:'middle'};
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-box" style={{width:'1100px'}} onClick={e => e.stopPropagation()}>
         <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'20px', color:'#111827'}}>
           {initial ? '届出を編集' : '届出を追加'}
@@ -723,8 +723,8 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
               style={{background:'#f3f4f6', color:'#6b7280', cursor:'default'}} />
           </div>
         </div>
-        {/* 2段目：顧問先名（ドロップダウン） */}
-        <div style={{marginBottom:'20px'}}>
+        {/* 2段目：顧問先名（ドロップダウン）／ステータス（臨時の補助金は区分ごとにステータスがあるため対象外） */}
+        <div style={{display:'grid', gridTemplateColumns: isRinji ? '1fr' : '1fr 1fr', gap:'14px', marginBottom:'20px'}}>
           <div>
             <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>顧問先名</label>
             <select value={shared['顧問先名']} onChange={e => {
@@ -736,17 +736,15 @@ function DeliveryModal({ initial, defaultNendo, allRows, masters, isRinji, isBas
               {masters.map(m => <option key={m.id} value={m['顧問先名']}>{m['顧問先名']}</option>)}
             </select>
           </div>
+          {!isRinji && (
+            <div>
+              <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>ステータス</label>
+              <select value={status} onChange={e => setStatus(e.target.value)}>
+                {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+          )}
         </div>
-
-        {/* ステータス（臨時の補助金は区分ごとにステータスがあるため対象外） */}
-        {!isRinji && (
-          <div style={{marginBottom:'20px'}}>
-            <label style={{fontWeight:'700', display:'block', marginBottom:'5px'}}>ステータス</label>
-            <select value={status} onChange={e => setStatus(e.target.value)}>
-              {STATUS_LIST.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
-          </div>
-        )}
 
         {/* 提出先リスト */}
         <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'8px'}}>
@@ -903,7 +901,7 @@ function CopySelectModal({ title, confirmMsg, srcGroups, onExecute, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-box" style={{width:'520px'}} onClick={e => e.stopPropagation()}>
         <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'16px', color:'#111827'}}>{title}</h2>
         <div style={{display:'flex', gap:'8px', marginBottom:'12px'}}>
@@ -950,7 +948,7 @@ function BulkDeadlineModal({ onExecute, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-box" style={{width:'400px'}} onClick={e => e.stopPropagation()}>
         <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'20px', color:'#111827'}}>提出期日を一括設定</h2>
         <div style={{marginBottom:'20px'}}>
@@ -1113,7 +1111,7 @@ function SubmissionImportPreviewModal({ plan, onExecute, onClose }) {
   }
 
   return (
-    <div className="modal-overlay" onClick={onClose}>
+    <div className="modal-overlay">
       <div className="modal-box" style={{width:'1100px'}} onClick={e => e.stopPropagation()}>
         <h2 style={{fontSize:'20px', fontWeight:'800', marginBottom:'12px', color:'#111827'}}>提出先データ インポート プレビュー</h2>
         <div style={{marginBottom:'14px', fontSize:'15px', color:'#374151'}}>
